@@ -43,6 +43,20 @@ The five later interventions use the shared **900-question non-binary subset**: 
 
 Every stress-test record retains the identifier of its baseline item. This paired design makes it possible to measure response transitions on the same question—for example, correct-to-incorrect flips after image removal or adoption of a prespecified wrong hint—rather than comparing aggregate accuracy across unrelated samples.
 
+## Study overview
+
+<p align="center">
+  <img src="assets/figure1_ab_problem.png" width="100%" alt="Figure 1 panels a and b: standard evaluation and the two hallucination routes">
+</p>
+
+Panels **a–b** establish the motivating problem. Models from all four families can reach the correct endpoint under standard evaluation, yet paired stress tests reveal two distinct failure routes: answering without usable visual evidence and following misleading text over the image. The benchmark therefore treats endpoint accuracy, visual grounding, and textual robustness as separate properties.
+
+<p align="center">
+  <img src="assets/figure1_c_benchmark_design.png" width="68%" alt="Figure 1 panel c: pathology benchmark sources, curation, and paired stress-test construction">
+</p>
+
+Panel **c** summarizes benchmark construction: four complementary pathology sources are filtered through rule-based eligibility checks and multi-LLM-assisted semantic review, then mapped to three visual and three textual paired interventions while preserving the baseline item identity.
+
 ## Six paired stress tests
 
 | Task | Route | Paired intervention | Targeted failure mode |
@@ -96,27 +110,27 @@ The final accuracy coordinate is the clinician-weighted sum of the four adjusted
 <table>
   <tr>
     <td width="56%" valign="top" align="center">
-      <strong>a · Six-task family profiles</strong><br><br>
+      <strong>Six-task family profiles</strong><br><br>
       <img src="assets/six_task_family_profiles.png" width="96%" alt="Six-task hallucination-resistance profiles by model family"><br>
       <sub>Family-level profiles expose route-specific strengths and weaknesses that a single accuracy value cannot show.</sub>
     </td>
     <td width="44%" valign="top" align="center">
-      <strong>b · Visual–text cross-route association</strong><br><br>
-      <img src="assets/visual_text_correlation.png" width="88%" alt="Cross-route Spearman correlations between visual and textual stress tests"><br>
+      <strong>Visual–text cross-route association</strong><br><br>
+      <img src="assets/visual_text_correlation.png" width="84%" alt="Cross-route Spearman correlations between visual and textual stress tests"><br>
       <sub>Positive, near-zero, and negative correlations show that visual and textual resistance are related but non-interchangeable.</sub>
     </td>
   </tr>
 </table>
 
-Panels **a–b** jointly show why the benchmark reports two hallucination routes. Model families with similar textual robustness can differ sharply in visual robustness, while the task-pair correlations are heterogeneous rather than uniformly strong.
+These complementary summaries show why the benchmark reports two hallucination routes. Model families with similar textual robustness can differ sharply in visual robustness, while the task-pair correlations are heterogeneous rather than uniformly strong.
 
 <p align="center">
-  <strong>c · Three-axis robustness landscape</strong><br><br>
-  <img src="assets/three_axis_pareto.png" width="74%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy"><br>
+  <strong>Three-axis robustness landscape</strong><br><br>
+  <img src="assets/three_axis_pareto.png" width="66%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy"><br>
   <sub>Each model is positioned by visual resistance, textual resistance, and clinician-weighted chance-adjusted accuracy; highlighted surfaces denote the first two Pareto layers.</sub>
 </p>
 
-Panel **c** preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
+The three-axis view preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
 
 ### Family-level numerical summary
 
