@@ -41,27 +41,7 @@ The baseline contains **1,200 pathology VQA questions** from four source dataset
 
 The five later interventions use the shared **900-question non-binary subset**: 500 four-choice, 200 six-choice, and 200 seven-choice questions. V1 uses all 1,200 baseline questions.
 
-```mermaid
-flowchart LR
-    A[1,200 baseline pathology VQA items] --> B[Visual route]
-    A --> C[Textual route]
-    B --> V1[V1 · Image removal]
-    B --> V2[V2 · Image–text conflict]
-    B --> V3[V3 · Image availability]
-    C --> T1[T1 · Unknown option]
-    C --> T2[T2 · Answer absence]
-    C --> T3[T3 · Wrong-answer hint]
-    V1 --> X[Visual resistance]
-    V2 --> X
-    V3 --> X
-    T1 --> Y[Text resistance]
-    T2 --> Y
-    T3 --> Y
-    A --> Z[Dataset-weighted accuracy]
-    X --> P[Three-axis robustness landscape]
-    Y --> P
-    Z --> P
-```
+Every stress-test record retains the identifier of its baseline item. This paired design makes it possible to measure response transitions on the same question—for example, correct-to-incorrect flips after image removal or adoption of a prespecified wrong hint—rather than comparing aggregate accuracy across unrelated samples.
 
 ## Six paired stress tests
 
@@ -113,27 +93,34 @@ The final accuracy coordinate is the clinician-weighted sum of the four adjusted
 
 ## Main findings
 
+<table>
+  <tr>
+    <td width="56%" valign="top" align="center">
+      <strong>a · Six-task family profiles</strong><br><br>
+      <img src="assets/six_task_family_profiles.png" width="96%" alt="Six-task hallucination-resistance profiles by model family"><br>
+      <sub>Family-level profiles expose route-specific strengths and weaknesses that a single accuracy value cannot show.</sub>
+    </td>
+    <td width="44%" valign="top" align="center">
+      <strong>b · Visual–text cross-route association</strong><br><br>
+      <img src="assets/visual_text_correlation.png" width="88%" alt="Cross-route Spearman correlations between visual and textual stress tests"><br>
+      <sub>Positive, near-zero, and negative correlations show that visual and textual resistance are related but non-interchangeable.</sub>
+    </td>
+  </tr>
+</table>
+
+Panels **a–b** jointly show why the benchmark reports two hallucination routes. Model families with similar textual robustness can differ sharply in visual robustness, while the task-pair correlations are heterogeneous rather than uniformly strong.
+
 <p align="center">
-  <img src="assets/six_task_family_profiles.png" width="62%" alt="Six-task robustness profiles by model family">
+  <strong>c · Three-axis robustness landscape</strong><br><br>
+  <img src="assets/three_axis_pareto.png" width="74%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy"><br>
+  <sub>Each model is positioned by visual resistance, textual resistance, and clinician-weighted chance-adjusted accuracy; highlighted surfaces denote the first two Pareto layers.</sub>
 </p>
 
-The six-task profiles reveal model-family-specific failure patterns that are hidden by overall accuracy. In particular, strong textual resistance does not imply strong visual resistance.
+Panel **c** preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
 
-<p align="center">
-  <img src="assets/visual_text_correlation.png" width="40%" alt="Visual-text cross-route Spearman correlation matrix">
-</p>
+### Family-level numerical summary
 
-The cross-route correlation matrix contains positive, near-zero, and negative associations. Visual and textual hallucination resistance therefore represent related but non-interchangeable properties and should be reported separately.
-
-<p align="center">
-  <img src="assets/three_axis_pareto.png" width="68%" alt="Three-axis Pareto landscape">
-</p>
-
-The three-axis landscape jointly represents visual resistance, textual resistance, and dataset-weighted accuracy. Pareto layers identify models that achieve competitive trade-offs without collapsing the three measurements into a single headline number.
-
-<p align="center">
-  <img src="assets/family_three_metrics.png" width="48%" alt="Mean three-axis scores for four model families">
-</p>
+The table below provides the exact family means corresponding to the three reported coordinates; the complete model-level values can be reproduced with the scoring notebook.
 
 | Model family | Visual resistance | Text resistance | Adjusted accuracy |
 |---|---:|---:|---:|
