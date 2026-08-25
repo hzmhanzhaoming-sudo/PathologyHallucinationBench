@@ -115,26 +115,12 @@ The textual route separates option-content instability, answer-absence detection
 
 Together, the two result figures show that apparently similar endpoint accuracy can arise from very different response-transition profiles. Visual grounding and textual robustness therefore remain separate reported coordinates rather than being collapsed into one unqualified hallucination rate.
 
-### Interactive three-axis robustness landscape
+### Three-axis robustness landscape
 
 <p align="center">
-  <a href="assets/Fig3D_interactive_pareto.html?raw=1">
-    <img src="assets/three_axis_pareto.png" width="100%" alt="Interactive three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy">
-  </a><br>
+  <img src="assets/three_axis_pareto.png" width="100%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy"><br>
   <sub>Visual resistance × textual resistance × clinician-weighted chance-adjusted accuracy. Highlighted surfaces denote the first two Pareto layers.</sub>
 </p>
-
-<p align="center">
-  <a href="assets/Fig3D_interactive_pareto.html?raw=1"><strong>Download the interactive 3D explorer</strong></a>
-  &nbsp;·&nbsp; drag to rotate &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; hover for model values
-</p>
-
-GitHub README pages cannot execute embedded JavaScript. Download the standalone HTML above and open it in a browser, or serve the cloned repository locally:
-
-```bash
-python3 -m http.server 8000
-# open http://localhost:8000/assets/Fig3D_interactive_pareto.html
-```
 
 The three-axis view preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
 
