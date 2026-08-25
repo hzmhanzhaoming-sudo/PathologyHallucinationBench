@@ -102,13 +102,6 @@ Visual resistance = 0.32974684×V1 + 0.31455696×V2 + 0.35569620×V3
 Text resistance   = 0.29059829×T1 + 0.36231884×T2 + 0.34708287×T3
 ```
 
-The exported overall hallucination-resistance score normalizes the same six clinician-derived task weights jointly:
-
-```text
-Overall resistance = 0.16487342×V1 + 0.15727848×V2 + 0.17784810×V3
-                   + 0.14529915×T1 + 0.18115942×T2 + 0.17354144×T3
-```
-
 For dataset `d`, chance-adjusted accuracy is:
 
 ```text
