@@ -119,28 +119,44 @@ The final accuracy coordinate is the clinician-weighted sum of the four adjusted
 
 ## Main findings
 
-<table>
-  <tr>
-    <td width="56%" valign="top" align="center">
-      <strong>Six-task family profiles</strong><br><br>
-      <img src="assets/six_task_family_profiles.png" width="96%" alt="Six-task hallucination-resistance profiles by model family"><br>
-      <sub>Family-level profiles expose route-specific strengths and weaknesses that a single accuracy value cannot show.</sub>
-    </td>
-    <td width="44%" valign="top" align="center">
-      <strong>Visual–text cross-route association</strong><br><br>
-      <img src="assets/visual_text_correlation.png" width="84%" alt="Cross-route Spearman correlations between visual and textual stress tests"><br>
-      <sub>Positive, near-zero, and negative correlations show that visual and textual resistance are related but non-interchangeable.</sub>
-    </td>
-  </tr>
-</table>
-
-These complementary summaries show why the benchmark reports two hallucination routes. Model families with similar textual robustness can differ sharply in visual robustness, while the task-pair correlations are heterogeneous rather than uniformly strong.
+### Visual stress-test results
 
 <p align="center">
-  <strong>Three-axis robustness landscape</strong><br><br>
-  <img src="assets/three_axis_pareto.png" width="66%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy"><br>
-  <sub>Each model is positioned by visual resistance, textual resistance, and clinician-weighted chance-adjusted accuracy; highlighted surfaces denote the first two Pareto layers.</sub>
+  <img src="assets/visual_stress_test_results.png" width="100%" alt="Visual hallucination stress-test results for image removal, image-text conflict, and image availability">
 </p>
+
+The visual route measures three distinct behaviors. **V1** tests whether correct answers survive after the image is removed; **V2** measures adoption of a prespecified misleading image description; and **V3** tests whether a model diagnoses when the image is present but correctly abstains when it is absent. The panels report both model-level and family-level response transitions.
+
+### Textual stress-test results
+
+<p align="center">
+  <img src="assets/text_stress_test_results.png" width="100%" alt="Textual hallucination stress-test results for unknown options, answer absence, and wrong-answer hints">
+</p>
+
+The textual route separates option-content instability, answer-absence detection, and resistance to explicit wrong-answer hints. **T1** traces accuracy as distractors are replaced by `unknown`; **T2** contrasts false NOTA acceptance with correct NOTA detection; and **T3** follows baseline-correct answers after an incorrect external suggestion.
+
+Together, the two result figures show that apparently similar endpoint accuracy can arise from very different response-transition profiles. Visual grounding and textual robustness therefore remain separate reported coordinates rather than being collapsed into one unqualified hallucination rate.
+
+### Interactive three-axis robustness landscape
+
+<p align="center">
+  <a href="assets/Fig3D_interactive_pareto.html?raw=1">
+    <img src="assets/three_axis_pareto.png" width="100%" alt="Interactive three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy">
+  </a><br>
+  <sub>Visual resistance × textual resistance × clinician-weighted chance-adjusted accuracy. Highlighted surfaces denote the first two Pareto layers.</sub>
+</p>
+
+<p align="center">
+  <a href="assets/Fig3D_interactive_pareto.html?raw=1"><strong>Download the interactive 3D explorer</strong></a>
+  &nbsp;·&nbsp; drag to rotate &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; hover for model values
+</p>
+
+GitHub README pages cannot execute embedded JavaScript. Download the standalone HTML above and open it in a browser, or serve the cloned repository locally:
+
+```bash
+python3 -m http.server 8000
+# open http://localhost:8000/assets/Fig3D_interactive_pareto.html
+```
 
 The three-axis view preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
 
