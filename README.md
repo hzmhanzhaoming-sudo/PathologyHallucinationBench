@@ -8,12 +8,24 @@
 [![Baseline items](https://img.shields.io/badge/Baseline_items-1%2C200-1F77B4)](#benchmark-composition)
 [![Stress tests](https://img.shields.io/badge/Stress_tests-6-E76F51)](#six-paired-stress-tests)
 [![Evaluated models](https://img.shields.io/badge/Evaluated_models-16-6A4C93)](#model-runners)
+[![Scoring smoke test](https://img.shields.io/badge/Scoring_smoke_test-passed-2A9D8F)](#reproducibility-check)
 
 **Standard accuracy can look strong even when a model ignores visual evidence, follows a misleading statement, or fails to recognize that the answer is absent. PathologyHallucinationBench makes these failure routes measurable.**
+
+[Overview](#study-overview) · [Dataset](#benchmark-composition) · [Stress tests](#six-paired-stress-tests) · [Scoring](#scoring) · [Results](#main-findings) · [Run](#quick-start)
 
 </div>
 
 ---
+
+<table align="center">
+  <tr>
+    <td align="center" width="25%"><strong>1,200</strong><br><sub>baseline pathology items</sub></td>
+    <td align="center" width="25%"><strong>6</strong><br><sub>paired stress tests</sub></td>
+    <td align="center" width="25%"><strong>16</strong><br><sub>evaluated models</sub></td>
+    <td align="center" width="25%"><strong>4</strong><br><sub>model families</sub></td>
+  </tr>
+</table>
 
 ## Why this benchmark?
 
@@ -170,6 +182,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+The base installation supports dataset inspection, API runners, and the scoring notebook. Local multimodal runners additionally require their original model repositories, checkpoints, and compatible `torch`/`transformers` environments.
+
 Run a model-family evaluator by changing only the model path, input file, output file, and image condition:
 
 ```bash
@@ -200,6 +214,27 @@ result/score_six_hallucination_tasks.ipynb
 ```
 
 The notebook exports six task scores, event counts, coverage audits, visual and textual clinician-weighted scores, and the clinician-weighted six-task summary.
+
+It can also be executed non-interactively:
+
+```bash
+jupyter nbconvert --to notebook --execute \
+  result/score_six_hallucination_tasks.ipynb \
+  --output score_six_hallucination_tasks.executed.ipynb \
+  --ExecutePreprocessor.timeout=600
+```
+
+## Reproducibility check
+
+The public package was checked at three levels before release:
+
+| Check | Scope | Status |
+|---|---|---|
+| Dataset audit | all V1–V3 and T1–T3 JSON files, row counts, identifiers, and paired conditions | **Passed** |
+| Runner validation | Python syntax compilation for all ten evaluator scripts | **Passed** |
+| Scoring smoke test | synthetic outputs spanning all six tasks, executed end-to-end through the notebook | **Passed** |
+
+The smoke test recognized all 11 required result conditions, produced coverage `1.0` for every task, and exported `six_task_robustness_scores.csv`, `six_task_event_counts.csv`, and `scoring_input_audit.csv`. Model inference itself remains environment-dependent because checkpoints and upstream model implementations are not redistributed in this repository.
 
 ## Model runners
 
