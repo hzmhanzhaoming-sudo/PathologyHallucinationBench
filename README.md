@@ -219,15 +219,14 @@ jupyter nbconvert --to notebook --execute \
 | `eval_unimedvl.py` | UniMedVL |
 | `eval_healthgpt_pro.py` | HealthGPT-Pro-4B, HealthGPT-Pro-8B |
 
-## Output schema
+## Dataset and evaluated models
 
-Evaluation outputs are append-safe JSONL records. The scoring notebook supports both common schemas:
+**Dataset.** [PathologyHallucinationBench dataset](https://huggingface.co/datasets/hanzhaoming/triplet-benchmark)
 
-- `predicted_label`, `gold_label`, `correct`, `source_file`;
-- `pred_letter`, `gold_letter`, `correct`.
+**Closed-source general models.** [Gemini 3.5 Flash Lite](https://ai.google.dev/gemini-api/docs/models), [Gemini 3.6 Flash](https://ai.google.dev/gemini-api/docs/models), [GPT-5.6 SOL](https://platform.openai.com/docs/models), and [GPT-5.6 Luna](https://platform.openai.com/docs/models).
 
-Only complete paired items enter each score denominator, and the exported coverage fields record the exact evaluated sample size.
+**Open-source general models.** [GLM-4.6V Flash](https://huggingface.co/zai-org/GLM-4.6V-Flash), [Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B), [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B), and [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B).
 
-## Scope
+**Pathology-specialized models.** [Quilt-LLaVA](https://github.com/aldraus/quilt-llava), [PathGen-LLaVA](https://huggingface.co/jamessyx/PathGen-LLaVA), [Patho-R1-3B](https://huggingface.co/WenchuanZhang/Patho-R1-3B), and [Patho-R1-7B](https://huggingface.co/WenchuanZhang/Patho-R1-7B).
 
-PathologyHallucinationBench is a research benchmark for controlled model evaluation. It does not provide clinical diagnoses or replace pathologist review.
+**General medical models.** [HuatuoGPT-Vision](https://github.com/FreedomIntelligence/HuatuoGPT-Vision), [UniMedVL](https://huggingface.co/General-Medical-AI/UniMedVL), [HealthGPT-Pro-4B](https://github.com/ZJU4HealthCare/HealthGPT/tree/main/HealthGPT-Pro), and [HealthGPT-Pro-8B](https://github.com/ZJU4HealthCare/HealthGPT/tree/main/HealthGPT-Pro).
