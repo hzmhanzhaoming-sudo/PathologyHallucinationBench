@@ -119,7 +119,7 @@ Together, the two result figures show that apparently similar endpoint accuracy 
 
 <p align="center">
   <img src="assets/three_axis_pareto.png" width="100%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and dataset-weighted accuracy"><br>
-  <sub>Visual resistance × textual resistance × clinician-weighted dataset accuracy. Highlighted surfaces denote the first two Pareto layers.</sub>
+  <sub>Visual resistance × textual resistance × clinician-weighted micro-accuracy across the four source datasets. Highlighted surfaces denote the first two Pareto layers.</sub>
 </p>
 
 The three-axis view preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
