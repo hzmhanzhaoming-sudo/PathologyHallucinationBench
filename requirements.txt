@@ -1,6 +1,7 @@
 tqdm>=4.66
 Pillow>=10.0
 pandas>=2.0
+huggingface_hub>=0.25
 ipykernel>=6.29
 jupyterlab>=4.0
 

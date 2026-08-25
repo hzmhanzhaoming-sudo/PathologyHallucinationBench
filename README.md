@@ -73,12 +73,14 @@ All six task scores range from 0 to 100, and **higher is better**.
 
 | Score | Definition |
 |---|---|
-| V1 | `100 × (1 − no-image-correct / image-correct)` |
+| V1 | `100 × [1 − clip((H1 − E1) / (O1 − E1), 0, 1)]` |
 | V2 | `100 × (1 − misleading-target adoption / original-correct)` |
 | V3 | `100 × correct image/no-image switches / image-correct` |
 | T1 | `100 × [1 − (L1 + G1 + L2 + G2) / 4]` |
 | T2 | `100 × [1 − (false-NOTA + missed-NOTA) / 2]` |
 | T3 | `100 × retained-correct after wrong hint / original-correct` |
+
+For V1, `O1` is the number of correct responses with the image, `H1` is the number of correct responses without the image, and `E1 = Σ_i(1/k_i)` is the item-level random expectation over the 1,200 paired questions (`k_i` is the number of answer options for item `i`). This chance adjustment reduces the influence of mixed option counts and initial accuracy. V1 is algebraically identical to `100 × clip((O1 − H1) / (O1 − E1), 0, 1)` whenever `O1 > E1`.
 
 The task weights come from five-dimensional ratings by three clinicians and are normalized within each route:
 
@@ -103,7 +105,7 @@ This formulation weights every evaluated item by the weight of its source datase
   <img src="assets/visual_stress_test_results.png" width="100%" alt="Visual hallucination stress-test results for image removal, image-text conflict, and image availability">
 </p>
 
-The visual route measures three distinct behaviors. **V1** tests whether correct answers survive after the image is removed; **V2** measures adoption of a prespecified misleading image description; and **V3** tests whether a model diagnoses when the image is present but correctly abstains when it is absent. The panels report both model-level and family-level response transitions.
+The visual route measures three distinct behaviors. **V1** quantifies the chance-adjusted loss of clean-image capability after image removal, so a higher score indicates weaker retention of no-image shortcuts; **V2** measures adoption of a prespecified misleading image description; and **V3** tests whether a model diagnoses when the image is present but correctly abstains when it is absent. The panels report both model-level and family-level response transitions.
 
 ### Textual stress-test results
 
@@ -130,17 +132,16 @@ The table below provides the exact family means corresponding to the three repor
 
 | Model family | Visual resistance | Text resistance | Dataset-weighted accuracy |
 |---|---:|---:|---:|
-| Closed-source general | 64.1 | 76.5 | 67.3 |
-| Open-source general | 45.2 | 76.8 | 62.0 |
-| Pathology-specialized | 26.6 | 70.3 | 54.1 |
-| General medical | 39.4 | 72.5 | 58.0 |
+| Closed-source general | 55.5 | 76.5 | 67.3 |
+| Open-source general | 34.5 | 76.8 | 62.0 |
+| Pathology-specialized | 19.8 | 70.3 | 54.1 |
+| General medical | 27.4 | 72.5 | 58.0 |
 
 ## Repository layout
 
 ```text
 PathologyHallucinationBench/
 ├── assets/                     # README figures
-├── data/                       # V1–V3 and T1–T3 JSON inputs
 ├── evaluation/                 # model-family evaluation runners
 ├── example/                    # one question represented across six tasks
 ├── result/
@@ -149,7 +150,7 @@ PathologyHallucinationBench/
 └── requirements.txt
 ```
 
-Task JSON files contain image filenames rather than machine-specific absolute paths. Source pathology images are stored separately and supplied at runtime through `--image-root`.
+Benchmark JSON files are distributed separately through the [PathologyHallucinationBench dataset repository](https://huggingface.co/datasets/hanzhaoming/triplet-benchmark) and are intentionally not duplicated in this Git repository. Download them into `data/` before running the evaluators. Task JSON files contain image filenames rather than machine-specific absolute paths; source pathology images are supplied at runtime through `--image-root`.
 
 ## Quick start
 
@@ -160,6 +161,9 @@ cd PathologyHallucinationBench
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Download the benchmark JSON files separately.
+hf download hanzhaoming/triplet-benchmark --repo-type dataset --local-dir data
 ```
 
 The base installation supports dataset inspection, API runners, and the scoring notebook. Local multimodal runners additionally require their original model repositories, checkpoints, and compatible `torch`/`transformers` environments.
@@ -194,15 +198,6 @@ result/score_six_hallucination_tasks.ipynb
 ```
 
 The notebook exports six task scores, event counts, coverage audits, the count-based dataset-weighted diagnostic accuracy, visual and textual clinician-weighted scores, and the clinician-weighted six-task summary.
-
-It can also be executed non-interactively:
-
-```bash
-jupyter nbconvert --to notebook --execute \
-  result/score_six_hallucination_tasks.ipynb \
-  --output score_six_hallucination_tasks.executed.ipynb \
-  --ExecutePreprocessor.timeout=600
-```
 
 It can also be executed non-interactively:
 

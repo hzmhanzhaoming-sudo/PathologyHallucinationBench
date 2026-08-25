@@ -12,9 +12,7 @@ logs/
 cache/
 checkpoints/
 raw_results/
-data/releases/
-data/raw/
-data/images/
+data/
 *.pt
 *.pth
 *.bin
