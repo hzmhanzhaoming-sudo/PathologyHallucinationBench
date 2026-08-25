@@ -18,7 +18,7 @@ Pathology visual question answering is usually reported as a single accuracy val
 
 PathologyHallucinationBench uses paired interventions on the same source questions to separate three capabilities:
 
-1. **Dataset-weighted diagnostic accuracy** — performance above the chance level of each source dataset.
+1. **Dataset-weighted diagnostic accuracy** — the clinician-weighted proportion of correctly answered items across the four source datasets.
 2. **Visual hallucination resistance** — robustness to missing images, image–text conflict, and image-availability switching.
 3. **Textual hallucination resistance** — robustness to option replacement, answer absence, and wrong-answer hints.
 
@@ -87,13 +87,13 @@ Visual resistance = 0.32974684×V1 + 0.31455696×V2 + 0.35569620×V3
 Text resistance   = 0.29059829×T1 + 0.36231884×T2 + 0.34708287×T3
 ```
 
-For dataset `d`, chance-adjusted accuracy is:
+For source dataset `d`, let `C_d` be the number of correct responses, `N_d` the number of evaluated items, and `w_d` its clinician-derived weight. The diagnostic-performance coordinate is a weighted micro-average:
 
 ```text
-AdjustedAccuracy_d = 100 × clip[(Accuracy_d − Chance_d) / (100 − Chance_d), 0, 1]
+DatasetWeightedAccuracy = 100 × Σ_d(w_d × C_d) / Σ_d(w_d × N_d)
 ```
 
-The final accuracy coordinate is the clinician-weighted sum of the four adjusted dataset accuracies.
+This formulation weights every evaluated item by the weight of its source dataset. Dataset size and clinician weight therefore jointly determine the contribution to the final coordinate. No chance correction or min–max transformation is applied.
 
 ## Main findings
 
@@ -118,8 +118,8 @@ Together, the two result figures show that apparently similar endpoint accuracy 
 ### Three-axis robustness landscape
 
 <p align="center">
-  <img src="assets/three_axis_pareto.png" width="100%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and adjusted accuracy"><br>
-  <sub>Visual resistance × textual resistance × clinician-weighted chance-adjusted accuracy. Highlighted surfaces denote the first two Pareto layers.</sub>
+  <img src="assets/three_axis_pareto.png" width="100%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and dataset-weighted accuracy"><br>
+  <sub>Visual resistance × textual resistance × clinician-weighted dataset accuracy. Highlighted surfaces denote the first two Pareto layers.</sub>
 </p>
 
 The three-axis view preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
@@ -128,12 +128,12 @@ The three-axis view preserves the three coordinates instead of compressing them 
 
 The table below provides the exact family means corresponding to the three reported coordinates; the complete model-level values can be reproduced with the scoring notebook.
 
-| Model family | Visual resistance | Text resistance | Adjusted accuracy |
+| Model family | Visual resistance | Text resistance | Dataset-weighted accuracy |
 |---|---:|---:|---:|
-| Closed-source general | 64.1 | 76.5 | 54.3 |
-| Open-source general | 45.2 | 76.8 | 46.7 |
-| Pathology-specialized | 26.6 | 70.3 | 34.1 |
-| General medical | 39.4 | 72.5 | 42.6 |
+| Closed-source general | 64.1 | 76.5 | 67.3 |
+| Open-source general | 45.2 | 76.8 | 62.0 |
+| Pathology-specialized | 26.6 | 70.3 | 54.1 |
+| General medical | 39.4 | 72.5 | 58.0 |
 
 ## Repository layout
 
@@ -193,7 +193,16 @@ Place each model's JSONL outputs under `result/<model_name>/`, then open and run
 result/score_six_hallucination_tasks.ipynb
 ```
 
-The notebook exports six task scores, event counts, coverage audits, visual and textual clinician-weighted scores, and the clinician-weighted six-task summary.
+The notebook exports six task scores, event counts, coverage audits, the count-based dataset-weighted diagnostic accuracy, visual and textual clinician-weighted scores, and the clinician-weighted six-task summary.
+
+It can also be executed non-interactively:
+
+```bash
+jupyter nbconvert --to notebook --execute \
+  result/score_six_hallucination_tasks.ipynb \
+  --output score_six_hallucination_tasks.executed.ipynb \
+  --ExecutePreprocessor.timeout=600
+```
 
 It can also be executed non-interactively:
 
