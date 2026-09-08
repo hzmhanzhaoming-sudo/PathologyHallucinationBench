@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Evaluate OpenAI GPT on the T1 pathology MCQ benchmark.
+"""Evaluate OpenAI GPT on the pathology MCQ benchmark (V1–V3 and T1–T3).
 
-The evaluator follows the same conventions as the other T1 scripts:
+The evaluator follows the same conventions as the other benchmark scripts:
   - one file supports both image and no-image modes;
   - the prompt is identical in both modes;
   - JSONL output records the complete question, raw answer and parsed label;
@@ -43,19 +43,19 @@ except Exception:
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DATA_DIR = REPOSITORY_ROOT / "data" / "releases" / "current" / "tasks" / "T1"
-DEFAULT_RESULT_DIR = str(REPOSITORY_ROOT / "outputs" / "gpt" / "T1")
+DEFAULT_DATA_DIR = REPOSITORY_ROOT / "data" / "V1"
+DEFAULT_RESULT_DIR = str(REPOSITORY_ROOT / "result" / "gpt")
 DEFAULT_WITH_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_with_image.json"
+    DEFAULT_DATA_DIR / "v1_with_image.json"
 )
 DEFAULT_WITHOUT_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_empty_image.json"
+    DEFAULT_DATA_DIR / "v1_without_image.json"
 )
 DEFAULT_WITH_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "gpt_T1_with_image.jsonl"
+    Path(DEFAULT_RESULT_DIR) / "v1_with_image.jsonl"
 )
 DEFAULT_WITHOUT_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "gpt_T1_no_image.jsonl"
+    Path(DEFAULT_RESULT_DIR) / "v1_without_image.jsonl"
 )
 
 DATASET_ORDER = ("QuiltVQA", "PathVQA", "PatchVQA", "PathMMU")
@@ -74,7 +74,7 @@ def parse_args():
         "--mode",
         choices=["with_image", "without_image", "both"],
         default=None,
-        help="Convenience mode using default T1 benchmark paths.",
+        help="Convenience mode using default V1 benchmark paths.",
     )
     parser.add_argument("--input", default=None, help="Single-run input JSON array.")
     parser.add_argument("--output", default=None, help="Single-run output JSONL.")
@@ -172,7 +172,10 @@ def load_finished_ids(path):
 
 
 def dataset_name(row):
-    prefix = str(row.get("num", "unknown")).split("-", 1)[0]
+    # T1 unknown variants may use a legacy 200- prefix for PatchVQA.
+    # Prefer the preserved baseline identifier without changing the input ID.
+    source_num = row.get("t1_original_num") or row.get("source_num") or row.get("num", "unknown")
+    prefix = str(source_num).split("-", 1)[0]
     return DATASET_PREFIX.get(prefix, f"Unknown_{prefix}")
 
 
@@ -368,6 +371,16 @@ def metrics(rows):
     }
 
 
+def infer_task_name(input_path):
+    """Read current public V1–V3/T1–T3 names; do not guess legacy numbering."""
+    parts = str(input_path or "").replace("\\", "/").split("/")
+    for part in reversed(parts):
+        match = re.search(r"(?:^|[_.-])([VT][123])(?=[_.-]|$)", part, re.I)
+        if match:
+            return match.group(1).upper()
+    return None
+
+
 def write_summary(output_path, input_path=None, model_id=None, use_image=None):
     latest = {}
     with open(output_path, "r", encoding="utf-8") as f:
@@ -407,7 +420,7 @@ def write_summary(output_path, input_path=None, model_id=None, use_image=None):
                 total_usage[key] += value
 
     summary = {
-        "task": "T1",
+        "task": infer_task_name(input_path),
         "model_id": model_id or (rows[0].get("model_id") if rows else None),
         "prediction_file": str(output_path),
         "input_file": str(input_path) if input_path is not None else None,
@@ -445,8 +458,8 @@ def planned_runs(args):
     with_output = Path(args.output or args.with_image_output)
     without_output = Path(args.output or args.without_image_output)
     if args.output is None and args.output_root != DEFAULT_RESULT_DIR:
-        with_output = output_root / "gpt_T1_with_image.jsonl"
-        without_output = output_root / "gpt_T1_no_image.jsonl"
+        with_output = output_root / "v1_with_image.jsonl"
+        without_output = output_root / "v1_without_image.jsonl"
 
     if args.mode == "with_image":
         return [(Path(args.input or args.with_image_input), with_output, True)]

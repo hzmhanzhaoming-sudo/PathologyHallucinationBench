@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate PathGen-LLaVA on the T1 pathology MCQ benchmark.
+"""Evaluate PathGen-LLaVA on the pathology MCQ benchmark (V1–V3 and T1–T3).
 
 This single-file evaluator supports both image and no-image modes. The prompt
 is intentionally identical for both modes:
@@ -29,12 +29,12 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REPO_ROOT = PROJECT_ROOT / "third_party" / "LLaVA"
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "PathGen-LLaVA"
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "releases" / "current" / "tasks" / "T1"
-DEFAULT_INPUT_WITH_IMAGE = DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_with_image.json"
-DEFAULT_INPUT_NO_IMAGE = DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_empty_image.json"
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "pathgen_llava" / "T1"
-DEFAULT_OUTPUT_WITH_IMAGE = DEFAULT_OUTPUT_DIR / "pathgen_llava_with_image.jsonl"
-DEFAULT_OUTPUT_NO_IMAGE = DEFAULT_OUTPUT_DIR / "pathgen_llava_no_image.jsonl"
+DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "V1"
+DEFAULT_INPUT_WITH_IMAGE = DEFAULT_DATA_DIR / "v1_with_image.json"
+DEFAULT_INPUT_NO_IMAGE = DEFAULT_DATA_DIR / "v1_without_image.json"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "result" / "pathgen_llava"
+DEFAULT_OUTPUT_WITH_IMAGE = DEFAULT_OUTPUT_DIR / "v1_with_image.jsonl"
+DEFAULT_OUTPUT_NO_IMAGE = DEFAULT_OUTPUT_DIR / "v1_without_image.jsonl"
 DEFAULT_IMAGE_ROOT = PROJECT_ROOT
 
 LABEL_RE = re.compile(r"^\s*([A-Z])\s*[\)\].:\-]?", re.I)
@@ -182,7 +182,10 @@ def get_dataset_name(row: dict[str, Any]) -> str:
     explicit = row.get("category") or row.get("dataset") or row.get("source")
     if explicit:
         return str(explicit)
-    prefix = str(row.get("num", "")).split("-", 1)[0]
+    # T1 unknown variants may use a legacy 200- prefix for PatchVQA.
+    # Prefer the preserved baseline identifier without changing the input ID.
+    source_num = row.get("t1_original_num") or row.get("source_num") or row.get("num", "unknown")
+    prefix = str(source_num).split("-", 1)[0]
     return NUM_PREFIX_TO_DATASET.get(prefix, prefix or "unknown")
 
 

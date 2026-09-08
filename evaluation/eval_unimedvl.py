@@ -28,19 +28,19 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REPO_ROOT = str(PROJECT_ROOT / "third_party" / "UniMedVL")
 DEFAULT_MODEL_PATH = str(PROJECT_ROOT / "models" / "UniMedVL")
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "releases" / "current" / "tasks" / "T1"
-DEFAULT_RESULT_DIR = str(PROJECT_ROOT / "outputs" / "unimedvl" / "T1")
+DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "V1"
+DEFAULT_RESULT_DIR = str(PROJECT_ROOT / "result" / "unimedvl")
 DEFAULT_WITH_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_with_image.json"
+    DEFAULT_DATA_DIR / "v1_with_image.json"
 )
 DEFAULT_WITHOUT_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_empty_image.json"
+    DEFAULT_DATA_DIR / "v1_without_image.json"
 )
 DEFAULT_WITH_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "unimedvl_with_image_debug.jsonl"
+    Path(DEFAULT_RESULT_DIR) / "v1_with_image.jsonl"
 )
 DEFAULT_WITHOUT_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "unimedvl_text_force_debug.jsonl"
+    Path(DEFAULT_RESULT_DIR) / "v1_without_image.jsonl"
 )
 DEFAULT_IMAGE_ROOT = str(PROJECT_ROOT)
 
@@ -159,7 +159,10 @@ def load_finished_ids(output_path: Path):
 
 
 def get_dataset_name(row):
-    prefix = str(row.get("num", "unknown")).split("-", 1)[0]
+    # T1 unknown variants may use a legacy 200- prefix for PatchVQA.
+    # Prefer the preserved baseline identifier without changing the input ID.
+    source_num = row.get("t1_original_num") or row.get("source_num") or row.get("num", "unknown")
+    prefix = str(source_num).split("-", 1)[0]
     return DATASET_PREFIX.get(prefix, f"Unknown_{prefix}")
 
 
@@ -581,8 +584,8 @@ def planned_runs(args):
     with_output = Path(args.output or args.with_image_output)
     without_output = Path(args.output or args.without_image_output)
     if args.output is None and args.output_root != DEFAULT_RESULT_DIR:
-        with_output = output_root / "unimedvl_with_image_debug.jsonl"
-        without_output = output_root / "unimedvl_text_force_debug.jsonl"
+        with_output = output_root / "v1_with_image.jsonl"
+        without_output = output_root / "v1_without_image.jsonl"
 
     if args.mode == "with_image":
         return [(Path(args.input or args.with_image_input), with_output, True)]
