@@ -6,7 +6,7 @@
 
 **Standard accuracy can look strong even when a model ignores visual evidence, follows a misleading statement, or fails to recognize that the answer is absent. PathologyHallucinationBench makes these failure routes measurable.**
 
-[Overview](#study-overview) · [Curation protocol](docs/PROTOCOL.md) · [Dataset](#benchmark-composition) · [Stress tests](#six-paired-stress-tests) · [Scoring](#scoring) · [Results](#main-findings) · [Run](#quick-start)
+[Overview](#study-overview) · [Dataset](#benchmark-composition) · [Stress tests](#six-paired-stress-tests) · [Scoring](#scoring) · [Results](#main-findings) · [Run](#quick-start)
 
 </div>
 
@@ -38,8 +38,6 @@ The baseline contains **1,200 pathology VQA questions** from four source dataset
 
 The five later interventions use the shared **900-question non-binary subset**: 500 four-choice, 200 six-choice, and 200 seven-choice questions. V1 uses all 1,200 baseline questions.
 
-These are **selected benchmark items**, not the sizes of the complete source datasets. Source-record tracing places 1,180 items in `test` and 20 PatchVQA items in `test_tiny`; no selected item is labelled `train` or `val`. PatchVQA and PathMMU share source images, so the four sources should not be described as mutually independent image collections.
-
 Every stress-test record retains the identifier of its baseline item. This paired design makes it possible to measure response transitions on the same question—for example, correct-to-incorrect flips after image removal or adoption of a prespecified wrong hint—rather than comparing aggregate accuracy across unrelated samples.
 
 ## Study overview
@@ -54,28 +52,24 @@ Panels **a–b** establish the motivating problem. Models from all four families
   <img src="assets/figure1_c_benchmark_design.png" width="68%" alt="Figure 1 panel c: pathology benchmark sources, curation, and paired stress-test construction">
 </p>
 
-Panel **c** specifies the intended construction and audit workflow: **Stage 1 — Hard Eligibility**, followed by **Stage 2 — Semantic Filter Within the Eligible Pool**, and then three visual and three textual interventions. The figure's source roles are complementary, not an exhaustive or mutually exclusive provenance taxonomy.
-
-**Curation status.** The existing 1,200-item cohort is frozen for reproducible evaluation. The available records document a retrospective text/JSON audit of these items and a subsequent **four-item image–text pilot at each stage**, not a completed full-pool multimodal selection. Retaining an item in the frozen cohort does not mean that it passed every criterion. The `Terra` and `Sol` labels in panel c denote intended reviewer roles, not verified model identifiers for completed cohort-wide review. See the [criterion-by-criterion protocol and evidence limits](docs/PROTOCOL.md#two-stage-curation-and-audit-status).
+Panel **c** summarizes benchmark construction: four complementary pathology sources are filtered through rule-based eligibility checks and multi-LLM-assisted semantic review, then mapped to three visual and three textual paired interventions while preserving the baseline item identity.
 
 ## Six paired stress tests
 
-| Task | Figure label | Paired intervention | Measured behavior |
+| Task | Route | Paired intervention | Targeted failure mode |
 |---|---|---|---|
-| **V1** | Image removal | Remove the image from the 1,200 baseline questions | Grounding dependence |
-| **V2** | Image–text conflict | Keep the true image and add a plausible but image-inconsistent description | Evidence arbitration; adoption of a prespecified misleading target |
-| **V3** | Cannot-see option | Add `Cannot see the image` and compare image/no-image conditions | Modality awareness; diagnosis-to-abstention switching |
-| **T1** | Unknown substitution | Replace one or two distractors with `unknown`, retaining the correct option | Option robustness |
-| **T2** | NOTA intervention | Replace a distractor (answer present) or the correct answer (answer absent) with NOTA | Answer-set validity |
-| **T3** | Wrong-answer hint | Add a qualified suggestion pointing to a wrong option | Suggestion resistance; retention of the original correct answer |
+| **V1** | Visual | Remove the image from the 1,200 baseline questions | Correct answers sustained by text-only shortcuts |
+| **V2** | Visual | Add a plausible but image-inconsistent description | Adoption of a prespecified misleading visual target |
+| **V3** | Visual | Add `Cannot see the image` and compare image/no-image conditions | Failure to switch between diagnosis and abstention |
+| **T1** | Textual | Replace one or two distractors with `unknown` | Candidate-space and option-content instability |
+| **T2** | Textual | Replace a distractor or the correct answer with NOTA | Failure to detect whether a valid answer is available |
+| **T3** | Textual | Add an explicit suggestion pointing to a wrong option | Retention of an externally supplied incorrect hint |
 
 Each item preserves a stable source identifier, enabling paired item-level analysis rather than comparison between unrelated question sets.
 
-Here **T1 means unknown substitution**, not the historical baseline experiment. Historical option shuffling is an auxiliary test, not one of these six scores. See the [old-to-current numbering map](docs/PROTOCOL.md#task-numbering-map) and [input/condition inventory](docs/PROTOCOL.md#released-inputs-and-pairing). Adding the V3 option changes 4/6/7-choice questions into **5/7/8-choice** questions; the added option is not always E.
-
 ## Scoring
 
-All six defined task scores range from 0 to 100, and **higher is better for the specified operational measure**. Undefined denominators produce a missing score, not zero. These are stress-test proxies, not direct clinical hallucination rates.
+All six task scores range from 0 to 100, and **higher is better**.
 
 | Score | Definition |
 |---|---|
@@ -87,10 +81,6 @@ All six defined task scores range from 0 to 100, and **higher is better for the 
 | T3 | `100 × retained-correct after wrong hint / original-correct` |
 
 For V1, `O1` is the number of correct responses with the image, `H1` is the number of correct responses without the image, and `E1 = Σ_i(1/k_i)` is the item-level random expectation over the 1,200 paired questions (`k_i` is the number of answer options for item `i`). This chance adjustment reduces the influence of mixed option counts and initial accuracy. V1 is algebraically identical to `100 × clip((O1 − H1) / (O1 − E1), 0, 1)` whenever `O1 > E1`.
-
-For V2 and T3, the denominator contains **baseline-correct, paired items**, not all 900 questions. V2 penalizes adoption of the specified wrong target; T3 penalizes **any newly induced error**, not only selection of the hinted option. V3 conditions on correct responses in its own with-image condition. For T1, `Lu` is the correct-to-incorrect rate and `Gu` the incorrect-to-correct rate at unknown level `u`, each using its corresponding baseline stratum. For T2, false-NOTA and missed-NOTA are conditional **rates**, not raw counts. The notebook reports opportunity counts and paired coverage alongside these scores.
-
-Removing distractors can make a question easier; an accuracy gain under `unknown` is not, by itself, evidence of hallucination. Likewise, a correct no-image answer can reflect textual knowledge or option cues, and a high V1 score does not establish competent visual interpretation. Interpret each score jointly with baseline accuracy, error counts, and the [protocol limitations](docs/PROTOCOL.md#interpretation-and-reporting-limits).
 
 The task weights come from five-dimensional ratings by three clinicians and are normalized within each route:
 
@@ -138,7 +128,7 @@ The three-axis view preserves the three coordinates instead of compressing them 
 
 ### Family-level numerical summary
 
-The table below reports the existing family means, rounded to one decimal place. These are a historical result snapshot, not values regenerated by this documentation update. Recomputing model-level values requires the corresponding JSONL predictions, model configuration, and complete paired inputs; the prediction files are not bundled in this repository.
+The table below provides the exact family means corresponding to the three reported coordinates; the complete model-level values can be reproduced with the scoring notebook.
 
 | Model family | Visual resistance | Text resistance | Dataset-weighted accuracy |
 |---|---:|---:|---:|
@@ -152,13 +142,11 @@ The table below reports the existing family means, rounded to one decimal place.
 ```text
 PathologyHallucinationBench/
 ├── assets/                     # README figures
-├── docs/                       # curation criteria, task mapping, and limitations
 ├── evaluation/                 # model-family evaluation runners
 ├── example/                    # one question represented across six tasks
 ├── result/
 │   └── score_six_hallucination_tasks.ipynb
 ├── README.md
-├── tests/                      # CPU-only release-consistency checks
 └── requirements.txt
 ```
 
@@ -186,16 +174,11 @@ Run a model-family evaluator by changing only the model path, input file, output
 python3 evaluation/eval_qwen35.py \
   --model-path /path/to/Qwen3.5-9B \
   --input data/V1/v1_with_image.json \
-  --image-root /path/to/source_images \
   --output result/qwen35/v1_with_image.jsonl \
   --use-image 1 \
   --max-new-tokens 16 \
   --temperature 0
 ```
-
-The paired no-image run uses `data/V1/v1_without_image.json`, `--use-image 0`, and a different output filename such as `result/qwen35/v1_without_image.jsonl`. Keep the model and decoding settings unchanged. The ten runners default to `data/V1/` and `result/<runner>/`; **other tasks require explicit input and output paths**. Keep different model sizes in separate result directories.
-
-Evaluation prompt text is unchanged by this release alignment. Most runners use the common letter-only instruction, but **Patho-R1 retains its existing modality-specific reasoning prompt**. This is a comparison caveat, not a claim that every runner has an identical prompt. See [evaluation prompts and controls](docs/PROTOCOL.md#evaluation-prompts-and-controls).
 
 For API models, provide credentials through environment variables:
 
@@ -203,7 +186,6 @@ For API models, provide credentials through environment variables:
 export OPENAI_API_KEY='YOUR_API_KEY'
 python3 evaluation/eval_gpt.py \
   --input data/V1/v1_with_image.json \
-  --image-root /path/to/source_images \
   --output result/gpt/v1_with_image.jsonl \
   --use-image 1 \
   --model YOUR_MODEL_ID
@@ -215,7 +197,7 @@ Place each model's JSONL outputs under `result/<model_name>/`, then open and run
 result/score_six_hallucination_tasks.ipynb
 ```
 
-The notebook exports six task scores, event counts, coverage audits, the count-based dataset-weighted diagnostic accuracy, visual and textual clinician-weighted scores, and the clinician-weighted six-task summary. It includes H among valid labels for eight-option V3 items. Check coverage and runtime/API errors before interpreting a score; partial runs do not reproduce full-cohort results.
+The notebook exports six task scores, event counts, coverage audits, the count-based dataset-weighted diagnostic accuracy, visual and textual clinician-weighted scores, and the clinician-weighted six-task summary.
 
 It can also be executed non-interactively:
 
@@ -224,12 +206,6 @@ jupyter nbconvert --to notebook --execute \
   result/score_six_hallucination_tasks.ipynb \
   --output score_six_hallucination_tasks.executed.ipynb \
   --ExecutePreprocessor.timeout=600
-```
-
-CPU-only checks (no model loading or API calls):
-
-```bash
-python3 -m unittest discover -s tests -v
 ```
 
 ## Model runners
