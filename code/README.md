@@ -46,39 +46,3 @@ Public `t1_original_num`/`t1_unknown_count` and historical
 `t3_original_num`/`t3_unknown_count` are different schema names for the same pairing
 concept; the public notebook accepts either, but this is not a full dataset adapter.
 
-## Scores and provenance
-
-Keep diagnostic accuracy, visual resistance and textual resistance separate.
-There is no overall composite score. Six task scores and their event counts remain
-available. `score_axes.py` takes explicit clinician weights; it does not fit weights
-to performance. A zero opportunity denominator is undefined, not zero resistance.
-Prompt comparisons use each strategy's own opportunities for the primary analysis;
-common-opportunity comparisons are separate sensitivity analyses.
-
-Historical regression scripts require the original server files and, where noted,
-an external `comparison_12models.json` supplied through `--snapshot`. This export
-does not include old results, patient/test images, repeated historical source trees,
-plotting notebooks with cleanup actions, or the frozen duplicate scoring notebook.
-`package_manifest.json` describes this export, not the full desktop archive.
-
-The fixed few-shot source and reference texts are included for inspection, but the
-three source images must be obtained under the applicable upstream authorization.
-The original absolute-path metadata are retained for traceability; they are not
-portable defaults or an instruction to download/release those images. In particular,
-few-shot inference needs the exact reviewed source images and compatible suite
-hashes, not arbitrary substitute examples. Offline tests use synthetic images.
-
-## Explicit remaining limits
-
-- Screening is **not** the complete 4,500-to-1,200 curation pipeline: sampling,
-  deduplication, independent image review, neighbour retrieval and final selection
-  are not implemented by the three prompt adapters. No missing prompt is invented.
-- Screening provenance records the supplied slide/Note numbering at extraction
-  time; it is not a claim that the current manuscript still uses those numbers.
-- Server model environments and historical result/image paths remain external.
-  Passing offline tests is not evidence of successful GPU/API inference.
-- Figure-specific bootstrap confidence intervals, correlation/permutation analyses,
-  and all figure-generation scripts are not included in this code export. Existing
-  paired tests in the prompt scoring module do not replace those analyses.
-- Upstream dataset/image licenses and the release of the private Hugging Face
-  repository must be resolved independently; this update changes neither.
