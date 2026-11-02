@@ -197,7 +197,7 @@ Place each model's JSONL outputs under `result/<model_name>/`, then open and run
 result/score_six_hallucination_tasks.ipynb
 ```
 
-The notebook exports six task scores, event counts, coverage audits, the count-based dataset-weighted diagnostic accuracy, visual and textual clinician-weighted scores, and the clinician-weighted six-task summary.
+The notebook exports three separate performance dimensions: the count-based dataset-weighted diagnostic accuracy (`dataset_weighted_accuracy`), visual resistance (`visual_clinician_weighted`), and textual resistance (`text_clinician_weighted`). These dimensions are not combined into a single overall score. The six task scores, event counts, and coverage audits are retained for task-level analysis.
 
 It can also be executed non-interactively:
 
