@@ -1,23 +1,192 @@
+<div align="center">
+
 # PathologyHallucinationBench
 
-Code for six paired pathology stress tests and three-dimensional scoring.
+### A paired pathology benchmark for separating visual and textual hallucination resistance
+
+**Standard accuracy can look strong even when a model ignores visual evidence, follows a misleading statement, or fails to recognize that the answer is absent. PathologyHallucinationBench makes these failure routes measurable.**
+
+[Overview](#study-overview) · [Dataset](#benchmark-composition) · [Stress tests](#six-paired-stress-tests) · [Scoring](#scoring) · [Models](#evaluated-models) · [Results](#main-findings) · [Run](#quick-start)
+
+</div>
+
+---
+
+## Why this benchmark?
+
+Pathology visual question answering is usually reported as a single accuracy value. That value does not reveal *why* a model succeeds. A correct answer may arise from image-grounded interpretation, textual shortcuts, answer-option priors, or compliance with an external hint.
+
+PathologyHallucinationBench uses paired interventions on the same source questions to separate three capabilities:
+
+1. **Dataset-weighted diagnostic accuracy** — the clinician-weighted proportion of correctly answered items across the four source datasets.
+2. **Visual hallucination resistance** — robustness to missing images, image–text conflict, and image-availability switching.
+3. **Textual hallucination resistance** — robustness to option replacement, answer absence, and wrong-answer hints.
+
+The benchmark evaluates **16 models** from four families: closed-source general, open-source general, pathology-specialized, and general medical systems.
+
+## Benchmark composition
+
+The baseline contains **1,200 pathology VQA questions** from four source datasets.
+
+| Dataset | Items | Main answer format | Clinician-derived weight |
+|---|---:|---|---:|
+| QuiltVQA | 100 | Binary | 0.2227 |
+| PathVQA | 200 | Binary | 0.2312 |
+| PathMMU | 500 | Four-choice | 0.2850 |
+| PatchVQA | 400 | Six- or seven-choice | 0.2611 |
+| **Total** | **1,200** | — | **1.0000** |
+
+The five later interventions use the shared **900-question non-binary subset**: 500 four-choice, 200 six-choice, and 200 seven-choice questions. V1 uses all 1,200 baseline questions.
+
+Every stress-test record retains the identifier of its baseline item. This paired design makes it possible to measure response transitions on the same question—for example, correct-to-incorrect flips after image removal or adoption of a prespecified wrong hint—rather than comparing aggregate accuracy across unrelated samples.
+
+## Study overview
+
+<p align="center">
+  <img src="assets/figure1_ab_problem.png" width="100%" alt="Figure 1 panels a and b: standard evaluation and the two hallucination routes">
+</p>
+
+Panels **a–b** establish the motivating problem. Models from all four families can reach the correct endpoint under standard evaluation, yet paired stress tests reveal two distinct failure routes: answering without usable visual evidence and following misleading text over the image. The benchmark therefore treats endpoint accuracy, visual grounding, and textual robustness as separate properties.
+
+<p align="center">
+  <img src="assets/figure1_c_benchmark_design.png" width="68%" alt="Figure 1 panel c: pathology benchmark sources, curation, and paired stress-test construction">
+</p>
+
+Panel **c** summarizes benchmark construction: four complementary pathology sources are filtered through rule-based eligibility checks and multi-LLM-assisted semantic review, then mapped to three visual and three textual paired interventions while preserving the baseline item identity.
+
+## Six paired stress tests
+
+| Task | Route | Paired intervention | Targeted failure mode |
+|---|---|---|---|
+| **V1** | Visual | Remove the image from the 1,200 baseline questions | Correct answers sustained by text-only shortcuts |
+| **V2** | Visual | Add a plausible but image-inconsistent description | Adoption of a prespecified misleading visual target |
+| **V3** | Visual | Add `Cannot see the image` and compare image/no-image conditions | Failure to switch between diagnosis and abstention |
+| **T1** | Textual | Replace one or two distractors with `unknown` | Candidate-space and option-content instability |
+| **T2** | Textual | Replace a distractor or the correct answer with NOTA | Failure to detect whether a valid answer is available |
+| **T3** | Textual | Add an explicit suggestion pointing to a wrong option | Retention of an externally supplied incorrect hint |
+
+Each item preserves a stable source identifier, enabling paired item-level analysis rather than comparison between unrelated question sets.
+
+## Scoring
+
+All six task scores range from 0 to 100, and **higher is better**.
+
+| Score | Definition |
+|---|---|
+| V1 | `100 × [1 − clip((H1 − E1) / (O1 − E1), 0, 1)]` |
+| V2 | `100 × (1 − misleading-target adoption / original-correct)` |
+| V3 | `100 × correct image/no-image switches / image-correct` |
+| T1 | `100 × [1 − (L1 + G1 + L2 + G2) / 4]` |
+| T2 | `100 × [1 − (false-NOTA + missed-NOTA) / 2]` |
+| T3 | `100 × retained-correct after wrong hint / original-correct` |
+
+For V1, `O1` is the number of correct responses with the image, `H1` is the number of correct responses without the image, and `E1 = Σ_i(1/k_i)` is the item-level random expectation over the 1,200 paired questions (`k_i` is the number of answer options for item `i`). This chance adjustment reduces the influence of mixed option counts and initial accuracy. V1 is algebraically identical to `100 × clip((O1 − H1) / (O1 − E1), 0, 1)` whenever `O1 > E1`.
+
+The task weights come from five-dimensional ratings by three clinicians and are normalized within each route:
 
 ```text
-evaluation/
-  eval_*.py                         Model-family evaluators
-  run_benchmark.py                   Run planner for the Hugging Face layout
-  manuscript/                       Task-specific 16-model evaluation runners
-  tests/                            Evaluation-entry tests
-scoring/
-  score.py                          Command-line scoring
-  score_six_hallucination_tasks.ipynb Six-task scoring notebook
-  score_stress_run.py                Scoring for manuscript-layout runs
-  score_axes.py                      Three dimensions and Pareto layers
-  core/                             Shared scoring and input-validation functions
-  tests/                            Scoring tests
+Visual resistance = 0.32974684×V1 + 0.31455696×V2 + 0.35569620×V3
+Text resistance   = 0.29059829×T1 + 0.36231884×T2 + 0.34708287×T3
 ```
 
-## Install and download
+For source dataset `d`, let `C_d` be the number of correct responses, `N_d` the number of evaluated items, and `w_d` its clinician-derived weight. The diagnostic-performance coordinate is a weighted micro-average:
+
+```text
+DatasetWeightedAccuracy = 100 × Σ_d(w_d × C_d) / Σ_d(w_d × N_d)
+```
+
+This formulation weights every evaluated item by the weight of its source dataset. Dataset size and clinician weight therefore jointly determine the contribution to the final coordinate. No chance correction or min–max transformation is applied.
+
+## Evaluated models
+
+The benchmark covers **16 models in four families**, with four models per family. The names below follow the benchmark configurations.
+
+| Family | Evaluated model | Evaluation runner |
+|---|---|---|
+| Closed-source general | GPT-5.6 SOL | [eval_gpt.py](evaluation/eval_gpt.py) |
+| Closed-source general | GPT-5.6 Luna | [eval_gpt.py](evaluation/eval_gpt.py) |
+| Closed-source general | Gemini 3.5 Flash Lite | [eval_gemini.py](evaluation/eval_gemini.py) |
+| Closed-source general | Gemini 3.6 Flash | [eval_gemini.py](evaluation/eval_gemini.py) |
+| Open-source general | GLM-4.6V Flash | [eval_glm46v.py](evaluation/eval_glm46v.py) |
+| Open-source general | Qwen3.5-2B | [eval_qwen35.py](evaluation/eval_qwen35.py) |
+| Open-source general | Qwen3.5-4B | [eval_qwen35.py](evaluation/eval_qwen35.py) |
+| Open-source general | Qwen3.5-9B | [eval_qwen35.py](evaluation/eval_qwen35.py) |
+| Pathology-specialized | Quilt-LLaVA | [eval_quilt_llava.py](evaluation/eval_quilt_llava.py) |
+| Pathology-specialized | PathGen-LLaVA | [eval_pathgen_llava.py](evaluation/eval_pathgen_llava.py) |
+| Pathology-specialized | Patho-R1-3B | [eval_patho_r1.py](evaluation/eval_patho_r1.py) |
+| Pathology-specialized | Patho-R1-7B | [eval_patho_r1.py](evaluation/eval_patho_r1.py) |
+| General medical | HuatuoGPT-Vision | [eval_huatuogpt_vision.py](evaluation/eval_huatuogpt_vision.py) |
+| General medical | UniMedVL | [eval_unimedvl.py](evaluation/eval_unimedvl.py) |
+| General medical | HealthGPT-Pro-4B | [eval_healthgpt_pro.py](evaluation/eval_healthgpt_pro.py) |
+| General medical | HealthGPT-Pro-8B | [eval_healthgpt_pro.py](evaluation/eval_healthgpt_pro.py) |
+
+## Main findings
+
+### Visual stress-test results
+
+<p align="center">
+  <img src="assets/visual_stress_test_results.png" width="100%" alt="Visual hallucination stress-test results for image removal, image-text conflict, and image availability">
+</p>
+
+The visual route measures three distinct behaviors. **V1** quantifies the chance-adjusted loss of clean-image capability after image removal, so a higher score indicates weaker retention of no-image shortcuts; **V2** measures adoption of a prespecified misleading image description; and **V3** tests whether a model diagnoses when the image is present but correctly abstains when it is absent. The panels report both model-level and family-level response transitions.
+
+### Textual stress-test results
+
+<p align="center">
+  <img src="assets/text_stress_test_results.png" width="100%" alt="Textual hallucination stress-test results for unknown options, answer absence, and wrong-answer hints">
+</p>
+
+The textual route separates option-content instability, answer-absence detection, and resistance to explicit wrong-answer hints. **T1** traces accuracy as distractors are replaced by `unknown`; **T2** contrasts false NOTA acceptance with correct NOTA detection; and **T3** follows baseline-correct answers after an incorrect external suggestion.
+
+Together, the two result figures show that apparently similar endpoint accuracy can arise from very different response-transition profiles. Visual grounding and textual robustness therefore remain separate reported coordinates rather than being collapsed into one unqualified hallucination rate.
+
+### Three-axis robustness landscape
+
+<p align="center">
+  <img src="assets/three_axis_pareto.png" width="100%" alt="Three-axis Pareto landscape of visual resistance, textual resistance, and dataset-weighted accuracy"><br>
+  <sub>Visual resistance × textual resistance × clinician-weighted micro-accuracy across the four source datasets. Highlighted surfaces denote the first two Pareto layers.</sub>
+</p>
+
+The three-axis view preserves the three coordinates instead of compressing them into one headline score. The Pareto layers identify competitive trade-offs and make visible whether an apparently strong model is limited by perception, textual robustness, or baseline diagnostic performance.
+
+### Family-level numerical summary
+
+<p align="center">
+  <img src="assets/family_three_metrics.png" width="88%" alt="Family means of visual resistance, text resistance and dataset-weighted accuracy">
+</p>
+
+The table below provides the reported family means corresponding to the three reported coordinates; the complete model-level values can be reproduced with the scoring notebook.
+
+| Model family | Visual resistance | Text resistance | Dataset-weighted accuracy |
+|---|---:|---:|---:|
+| Closed-source general | 55.5 | 76.5 | 67.3 |
+| Open-source general | 34.5 | 76.8 | 62.0 |
+| Pathology-specialized | 19.8 | 70.3 | 54.1 |
+| General medical | 27.4 | 72.5 | 58.0 |
+
+### Six-task profiles and cross-task relationships
+
+<p align="center">
+  <img src="assets/six_task_family_profiles.png" width="49%" alt="Six-task resistance profiles for the four model families">
+  <img src="assets/visual_text_correlation.png" width="49%" alt="Spearman correlations between visual and textual task scores across models">
+</p>
+
+The family-level profiles retain all six task scores, while the correlation matrix summarizes relationships between visual and textual task performance across models.
+
+## Repository layout
+
+```text
+PathologyHallucinationBench/
+├── assets/       # Overview and result figures displayed on this page
+├── evaluation/   # Model-family runners, full run planner and manuscript runners
+├── scoring/      # Six-task scoring, three separate dimensions and Pareto analysis
+├── README.md
+└── requirements.txt
+```
+
+## Quick start
+
+### Installation and data
 
 ```bash
 pip install -r requirements.txt
@@ -29,7 +198,7 @@ uses `data/` and `images/`. Use an authorized Hugging Face login or `HF_TOKEN`.
 Local models require their checkpoints and compatible model environments;
 API credentials use `OPENAI_API_KEY` or `GEMINI_API_KEY`.
 
-## Evaluate
+### Run evaluation
 
 ```bash
 # Preview the 11 conditions; does not run inference.
@@ -44,7 +213,7 @@ The complete benchmark has 9,600 initial requests per model. The public-layout
 planner uses the model-family evaluators. Task-specific manuscript runners and
 their server-layout commands are in [`evaluation/manuscript`](evaluation/manuscript).
 
-## Score
+### Run scoring
 
 ```bash
 python scoring/score.py --repo-root . --output result/scored_qwen
@@ -70,7 +239,7 @@ python scoring/score_axes.py --scores six_task_scores.csv \
 
 CSV columns are documented in `scoring/score_axes.py`.
 
-## Test
+### Offline tests
 
 ```bash
 python -m unittest discover -s evaluation/tests -v
