@@ -12,6 +12,11 @@ logs/
 cache/
 checkpoints/
 raw_results/
+images/
+code/**/results/
+code/**/pilot_results/
+code/**/historical_reproduction_results/
+code/**/reports/
 data/
 *.pt
 *.pth

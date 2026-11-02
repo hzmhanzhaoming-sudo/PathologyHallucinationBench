@@ -1,0 +1,2 @@
+# Supports the server's Python 3.8; no model SDK needed.
+jsonschema>=4.18,<4.24

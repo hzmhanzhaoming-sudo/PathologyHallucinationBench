@@ -1,0 +1,21 @@
+{
+  "README.md": "42cd9fd975e356047b8abbaf899608f8ec875f51049370caca19fdc3bd616ff5",
+  "prepare.py": "9f29d9c9a2bf9a3a7a8f1f4a60f51415d3d61e89d73dbbda5e62f81548b06dfe",
+  "prompts/stage1_content_classification.fixed.txt": "74be57df417fd59ab0484ff612ccd8b26fcf91afe6797d173e98c3ab2032a1f1",
+  "prompts/stage1_eligibility_screening.fixed.txt": "f580dc948d11e9c818a6ea4c954cf00c6ac2c8dc53da0d3c14e8eb720ad57c8f",
+  "prompts/stage1_eligibility_screening.user_template.txt": "a987ce18a309d144b759bd4abfe1ef40c199d48b4f10c4c681413663570ebcad",
+  "prompts/stage2_semantic_comparison.fixed.txt": "cedc7ae61a3127d5d2707434cb331ed54045fdcf993d5656fdee5db49ca7306c",
+  "provenance/SOURCE_AUDIT.md": "40982c33eff67742427539c08b81919c5b5ff7512d91e2d606fd3751de923eb9",
+  "provenance/VALIDATION.md": "0be6f43de0c8e253104efa7c6095f06d614d6f33a142f26c7ee58e7dc52cd6c8",
+  "provenance/prompt_source_manifest.json": "a7c39cd559b58c2d36e85f768e949c8a7254b9aa5fc806e5bab2975e2d7dfb8c",
+  "provenance/stage1_content_classification.source_panel.txt": "4c48d960a1fe383b1237f974b8258a37875f9a3c92173a2eca6ea33ce37c3fd1",
+  "provenance/stage1_eligibility_screening.source_panel.txt": "64dea33235006631c9a88229c75e1a8709da7287bf8f948931fcf910ede3e0d2",
+  "provenance/stage2_semantic_comparison.source_panel.txt": "8552a5bbde5c106e757bf840e74660422f873b82cf105a091890103ae2d931de",
+  "requirements.txt": "0619eb15bdd834e7f62fa04c4e1be1ad0bfda117f114c141759cc5d30fd3d969",
+  "run_api.py": "82d76346a194797b6deb2d10b8d482a21f5aad848666f8cd79ad138d49e31060",
+  "screening.py": "a3f82b6e1c2102191be355e143973554da80bdc2d6b9440e0e4182669d0d4088",
+  "test_offline.py": "18ad01fd418bced3be8e28ef2f6f03c59f62c7ce6229eb3aec5a4fe616189ed2",
+  "test_prompt_source.py": "8c47ac6ea06ba502d21229860ba476066781820e0a1a78bcfe393ab0ffc8557d",
+  "validate_results.py": "cdeda26bb6792b4ca2326c4d08a79b1642d33cd50caf45b7d1a42dda84f3039b",
+  "verify_prompt_source.py": "5e4380a35a15f245f303ec85530814a8dc7b9721e555d901e8a6ff14708b078d"
+}

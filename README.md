@@ -143,6 +143,9 @@ The table below provides the exact family means corresponding to the three repor
 PathologyHallucinationBench/
 ├── assets/                     # README figures
 ├── evaluation/                 # model-family evaluation runners
+├── code/                       # curated desktop workflow modules (see code/README.md)
+├── tools/                      # safe public-layout run planner
+├── tests/                      # offline synthetic regression tests
 ├── example/                    # one question represented across six tasks
 ├── result/
 │   └── score_six_hallucination_tasks.ipynb
@@ -162,8 +165,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Download the benchmark JSON files separately.
-hf download hanzhaoming/triplet-benchmark --repo-type dataset --local-dir data
+# Download only data/ and images/, preserving the dataset's directory structure.
+# Access is currently restricted: use an authorized HF login or HF_TOKEN.
+# Do not download into data/: that would create data/data/.
+python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='hanzhaoming/triplet-benchmark', repo_type='dataset', local_dir='.', allow_patterns=['data/**', 'images/**'])"
 ```
 
 The base installation supports dataset inspection, API runners, and the scoring notebook. Local multimodal runners additionally require their original model repositories, checkpoints, and compatible `torch`/`transformers` environments.
@@ -176,6 +181,7 @@ python3 evaluation/eval_qwen35.py \
   --input data/V1/v1_with_image.json \
   --output result/qwen35/v1_with_image.jsonl \
   --use-image 1 \
+  --image-root images \
   --max-new-tokens 16 \
   --temperature 0
 ```
@@ -188,6 +194,7 @@ python3 evaluation/eval_gpt.py \
   --input data/V1/v1_with_image.json \
   --output result/gpt/v1_with_image.jsonl \
   --use-image 1 \
+  --image-root images \
   --model YOUR_MODEL_ID
 ```
 
@@ -198,6 +205,49 @@ result/score_six_hallucination_tasks.ipynb
 ```
 
 The notebook exports three separate performance dimensions: the count-based dataset-weighted diagnostic accuracy (`dataset_weighted_accuracy`), visual resistance (`visual_clinician_weighted`), and textual resistance (`text_clinician_weighted`). These dimensions are not combined into a single overall score. The six task scores, event counts, and coverage audits are retained for task-level analysis.
+
+The notebook now rejects malformed JSONL, duplicate IDs, unknown reference IDs,
+answer/option mismatches and incomplete condition coverage by default. It accepts
+the H option used by eight-option V3 items and preserves explicitly stored invalid
+predictions instead of reparsing their explanations. `ALLOW_PARTIAL=True` permits
+exploratory subsets only; `evaluation_complete` is exported with the results.
+The scoring formulas and clinician weights are unchanged. The six-task notebook
+is not the scorer for the seven-condition prompting experiments.
+
+To preview all 11 public-layout conditions (9,600 initial requests per model):
+
+```bash
+python tools/run_benchmark.py --runner eval_qwen35.py \
+  --model-path /path/to/Qwen3.5-9B --output-dir result/qwen_new --validate-inputs
+```
+
+This checks the local data/images and prints a plan without running inference.
+Only add `--execute` after reviewing the plan and runtime environment; it refuses
+an existing output directory. API use requires `--runner eval_gpt.py --model YOUR_MODEL_ID`
+instead of the local model arguments. This planner uses the existing public generic
+runners, not the frozen manuscript-era task-specific prompts.
+
+### Extended workflows and release scope
+
+See [`code/README.md`](code/README.md) for the added four-module workflow:
+six-task routing, scoring/three-axis/Pareto and regression tools, three prompting
+strategies, and screening prompt adapters. Their historical server layout is
+distinct from the public Hugging Face layout. Do not assume that changing a folder
+name alone makes the datasets or protocols interchangeable.
+
+The export excludes raw experiment results, test images, old report snapshots and
+duplicate historical notebooks. The screening adapters do not implement the entire
+candidate-selection pipeline. Figure-specific confidence-interval and correlation
+scripts remain outside this release. GPU/provider inference and full historical
+numerical reproduction still require their external data and runtime environments.
+
+Offline checks (no model calls):
+
+```bash
+python -m unittest discover -s tests -v
+python code/02_scoring/verify_all.py --offline-only --output /path/to/NEW_report
+python -m unittest discover -s code/04_screening -p 'test_*.py' -v
+```
 
 It can also be executed non-interactively:
 
