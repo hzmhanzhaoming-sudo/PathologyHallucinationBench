@@ -28,7 +28,7 @@ The benchmark evaluates **16 models** from four families: closed-source general,
 
 The baseline contains **1,200 pathology VQA questions** from four source datasets.
 
-| Dataset | Items | Main answer format | Clinician-derived weight |
+| Dataset | Questions | Main answer format | Clinician-derived weight |
 |---|---:|---|---:|
 | QuiltVQA | 100 | Binary | 0.2227 |
 | PathVQA | 200 | Binary | 0.2312 |
@@ -75,17 +75,7 @@ Each item preserves a stable source identifier, enabling paired item-level analy
 - **Visual resistance** — responses to altered or missing image evidence (V1–V3).
 - **Textual resistance** — responses to altered options and misleading hints (T1–T3).
 
-$$
-\begin{aligned}
-\text{Accuracy} &= 100\,\frac{\sum_d w_d C_d}{\sum_d w_d N_d} \\[6pt]
-\text{Visual resistance} &= \sum_{i=1}^{3}\alpha_i V_i \\[6pt]
-\text{Textual resistance} &= \sum_{i=1}^{3}\beta_i T_i
-\end{aligned}
-$$
-
-Here, $C_d$ and $N_d$ are the correct and total item counts for dataset $d$.
-Dataset weights $w_d$ and task weights $\alpha_i,\beta_i$ are clinician-derived;
-task weights sum to one within each resistance dimension.
+Dataset and task weights are clinician-derived, with task weights normalized within each resistance dimension.
 
 The three dimensions are reported **separately, without a combined overall score**.
 Accuracy uses weighted item counts, with no chance correction or min–max scaling.
