@@ -6,7 +6,7 @@
 
 **Standard accuracy can look strong even when a model ignores visual evidence, follows a misleading statement, or fails to recognize that the answer is absent. PathologyHallucinationBench makes these failure routes measurable.**
 
-[Overview](#study-overview) · [Dataset](#benchmark-composition) · [Stress tests](#six-paired-stress-tests) · [Scoring](#scoring) · [Models](#evaluated-models) · [Results](#main-findings) · [Run](#quick-start)
+[Overview](#study-overview) · [Dataset](#benchmark-composition) · [Stress tests](#six-paired-stress-tests) · [Scoring](#scoring) · [Models](#evaluated-model-resources) · [Results](#main-findings) · [Run](#quick-start)
 
 </div>
 
@@ -97,29 +97,6 @@ DatasetWeightedAccuracy = 100 × Σ_d(w_d × C_d) / Σ_d(w_d × N_d)
 
 This formulation weights every evaluated item by the weight of its source dataset. Dataset size and clinician weight therefore jointly determine the contribution to the final coordinate. No chance correction or min–max transformation is applied.
 
-## Evaluated models
-
-The benchmark covers **16 models in four families**, with four models per family. The names below follow the benchmark configurations.
-
-| Family | Evaluated model | Evaluation runner |
-|---|---|---|
-| Closed-source general | GPT-5.6 SOL | [eval_gpt.py](evaluation/eval_gpt.py) |
-| Closed-source general | GPT-5.6 Luna | [eval_gpt.py](evaluation/eval_gpt.py) |
-| Closed-source general | Gemini 3.5 Flash Lite | [eval_gemini.py](evaluation/eval_gemini.py) |
-| Closed-source general | Gemini 3.6 Flash | [eval_gemini.py](evaluation/eval_gemini.py) |
-| Open-source general | GLM-4.6V Flash | [eval_glm46v.py](evaluation/eval_glm46v.py) |
-| Open-source general | Qwen3.5-2B | [eval_qwen35.py](evaluation/eval_qwen35.py) |
-| Open-source general | Qwen3.5-4B | [eval_qwen35.py](evaluation/eval_qwen35.py) |
-| Open-source general | Qwen3.5-9B | [eval_qwen35.py](evaluation/eval_qwen35.py) |
-| Pathology-specialized | Quilt-LLaVA | [eval_quilt_llava.py](evaluation/eval_quilt_llava.py) |
-| Pathology-specialized | PathGen-LLaVA | [eval_pathgen_llava.py](evaluation/eval_pathgen_llava.py) |
-| Pathology-specialized | Patho-R1-3B | [eval_patho_r1.py](evaluation/eval_patho_r1.py) |
-| Pathology-specialized | Patho-R1-7B | [eval_patho_r1.py](evaluation/eval_patho_r1.py) |
-| General medical | HuatuoGPT-Vision | [eval_huatuogpt_vision.py](evaluation/eval_huatuogpt_vision.py) |
-| General medical | UniMedVL | [eval_unimedvl.py](evaluation/eval_unimedvl.py) |
-| General medical | HealthGPT-Pro-4B | [eval_healthgpt_pro.py](evaluation/eval_healthgpt_pro.py) |
-| General medical | HealthGPT-Pro-8B | [eval_healthgpt_pro.py](evaluation/eval_healthgpt_pro.py) |
-
 ## Dataset and model source links
 
 ### Benchmark data
@@ -139,7 +116,7 @@ Please cite the original source works and follow their respective licenses and a
 
 ### Evaluated model resources
 
-The model names above follow the experiment configurations. The links below restore the original model-resource references; provider model catalogs are general documentation, not immutable snapshots of the evaluated API versions.
+The benchmark evaluates **16 models across four families**, with four models per family. Names follow the experiment configurations. Provider catalogs are general documentation, not immutable snapshots of the evaluated API versions. Model-family runners are in [`evaluation/`](evaluation/).
 
 - **Closed-source general:** [GPT model documentation](https://platform.openai.com/docs/models) (GPT-5.6 SOL / Luna configuration labels); [Gemini model documentation](https://ai.google.dev/gemini-api/docs/models) (Gemini 3.5 Flash Lite / 3.6 Flash configuration labels).
 - **Open-source general:** [GLM-4.6V Flash](https://huggingface.co/zai-org/GLM-4.6V-Flash), [Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B), [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B), [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B).
@@ -180,15 +157,6 @@ The three-axis view preserves the three coordinates instead of compressing them 
 <p align="center">
   <img src="assets/family_three_metrics.png" width="88%" alt="Family means of visual resistance, text resistance and dataset-weighted accuracy">
 </p>
-
-The table below provides the reported family means corresponding to the three reported coordinates; the complete model-level values can be reproduced with the scoring notebook.
-
-| Model family | Visual resistance | Text resistance | Dataset-weighted accuracy |
-|---|---:|---:|---:|
-| Closed-source general | 55.5 | 76.5 | 67.3 |
-| Open-source general | 34.5 | 76.8 | 62.0 |
-| Pathology-specialized | 19.8 | 70.3 | 54.1 |
-| General medical | 27.4 | 72.5 | 58.0 |
 
 ### Six-task profiles and cross-task relationships
 
