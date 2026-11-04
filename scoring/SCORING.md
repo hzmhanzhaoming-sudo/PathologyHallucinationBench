@@ -1,36 +1,50 @@
 # Scoring definitions
 
-[← Back to the benchmark overview](../README.md#scoring)
+Scores are percentages on a 0–100 scale, reported separately. Complete paired IDs
+are required. A correct response is a stored parsed label equal to the reference
+answer. An invalid (`null`) label is not correct.
 
-All six task scores range from 0 to 100, and **higher is better**.
+| Task | Formula | Denominator and event definition |
+|---|---|---|
+| V1 | `100 * clip((O-H)/(O-E), 0, 1)` | `O`: correct with image; `H`: correct without image; `E=sum(1/option_count)` over all baseline items |
+| V2 | `100 * (1-H/O)` | Among baseline-correct core items (`O`), `H` adopt the prespecified misleading target |
+| V3 | `100 * S/O` | `O`: correct in the augmented-option image-present condition; `S`: also correctly abstain without the image |
+| T1 | `100 * [1-(L1/C+G1/W+L2/C+G2/W)/4]` | `C,W`: baseline-correct/wrong core items; `Lj`: lost correct answers; `Gj`: gained correct answers at unknown-option level `j` |
+| T2 | `100 * [1-(F/O+M/O)/2]` | `O`: baseline-correct core items; `F`: false NOTA selection when answer present; `M`: failure to select NOTA when answer absent |
+| T3 | `100 * R/O` | Among baseline-correct core items (`O`), `R` remain correct after the wrong hint |
 
-| Score | Definition |
-|---|---|
-| V1 | `100 × [1 − clip((H1 − E1) / (O1 − E1), 0, 1)]` |
-| V2 | `100 × (1 − misleading-target adoption / original-correct)` |
-| V3 | `100 × correct image/no-image switches / image-correct` |
-| T1 | `100 × [1 − (L1 + G1 + L2 + G2) / 4]` |
-| T2 | `100 × [1 − (false-NOTA + missed-NOTA) / 2]` |
-| T3 | `100 × retained-correct after wrong hint / original-correct` |
+V1 is undefined if `O <= E`. V2/V3/T2/T3 are undefined when their opportunity set
+is empty. T1 is undefined if either `C` or `W` is zero. Undefined is not zero or 100.
 
-For V1, `O1` is the number of correct responses with the image, `H1` is the number of correct responses without the image, and `E1 = Σ_i(1/k_i)` is the item-level random expectation over the 1,200 paired questions (`k_i` is the number of answer options for item `i`). This chance adjustment reduces the influence of mixed option counts and initial accuracy. V1 is algebraically identical to `100 × clip((O1 − H1) / (O1 − E1), 0, 1)` whenever `O1 > E1`.
+Important distinctions:
 
-The task weights come from five-dimensional ratings by three clinicians and are normalized within each route:
+- V2 counts adoption of a **specified target**, not every incorrect response.
+  Other errors and invalid responses lower ordinary accuracy, but do not count as
+  target adoption. Therefore V2 alone is not a measure of all response reliability.
+- V3 uses its own image-present condition, not the ordinary baseline, for `O`.
+- T1 treats both losses and gains after distractor replacement as instability.
+- T2 measures the two specified availability errors, not mean condition accuracy.
+  Invalid responses count as missed NOTA in the answer-absent condition, but are
+  not themselves false NOTA selection in the answer-present condition.
+
+## Separate dimensions
+
+With explicit, within-domain normalized weights:
 
 ```text
-Visual resistance = 0.32974684×V1 + 0.31455696×V2 + 0.35569620×V3
-Text resistance   = 0.29059829×T1 + 0.36231884×T2 + 0.34708287×T3
+visual_resistance = sum(visual_weight[j] * Vj)
+text_resistance = sum(text_weight[j] * Tj)
+weighted_accuracy = 100 * sum(dataset_weight[d] * correct[d])
+                        / sum(dataset_weight[d] * total[d])
 ```
 
-For source dataset `d`, let `C_d` be the number of correct responses, `N_d` the number of evaluated items, and `w_d` its clinician-derived weight. The diagnostic-performance coordinate is a weighted micro-average:
+Weighted accuracy is a ratio of weighted item counts, **not** a mean of the four
+dataset percentages. Dataset size remains part of the weighting. No chance
+correction is applied to this accuracy coordinate. The supplied weights remain
+at their given precision; they are not silently re-estimated or re-normalized.
 
-```text
-DatasetWeightedAccuracy = 100 × Σ_d(w_d × C_d) / Σ_d(w_d × N_d)
-```
+Pareto dominance requires being at least as high on all three axes and strictly
+higher on at least one. Equal points do not dominate each other. Layers are
+computed only among the supplied models; they are not a fixed published ranking.
 
-This formulation weights every evaluated item by the weight of its source dataset. Dataset size and clinician weight therefore jointly determine the contribution to the final coordinate. No chance correction or min–max transformation is applied.
-
-
-## Implementation
-
-Use [score.py](score.py) for public-layout predictions, [score_stress_run.py](score_stress_run.py) for manuscript-layout runs, and [score_axes.py](score_axes.py) for the three separate dimensions. These documentation changes do not modify the scoring implementation.
+See [README.md](README.md) for input contracts and executable commands.

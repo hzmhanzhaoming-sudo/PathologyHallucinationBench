@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Evaluate UniMedVL on the unified pathology MCQ benchmark.
+"""Model adapter: unimedvl. Explicit input, output and model configuration.
 
-The evaluator calls UniMedVL's own ``codes.eval.vlm.utils`` loader from the
-directory supplied with ``--repo-root``. By default, inputs and outputs follow
-the repository release layout while all paths remain overridable from the CLI.
+Use run_benchmark.py to validate and evaluate all benchmark conditions.
 """
 
 from __future__ import annotations
+
+from backend_io import validate_backend_args, resolve_input_image
 
 import argparse
 import gc
@@ -25,26 +25,6 @@ from PIL import Image
 from tqdm import tqdm
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REPO_ROOT = str(PROJECT_ROOT / "third_party" / "UniMedVL")
-DEFAULT_MODEL_PATH = str(PROJECT_ROOT / "models" / "UniMedVL")
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "releases" / "current" / "tasks" / "T1"
-DEFAULT_RESULT_DIR = str(PROJECT_ROOT / "outputs" / "unimedvl" / "T1")
-DEFAULT_WITH_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_with_image.json"
-)
-DEFAULT_WITHOUT_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_empty_image.json"
-)
-DEFAULT_WITH_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "unimedvl_with_image_debug.jsonl"
-)
-DEFAULT_WITHOUT_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "unimedvl_text_force_debug.jsonl"
-)
-DEFAULT_IMAGE_ROOT = str(PROJECT_ROOT)
-
-
 DATASET_PREFIX = {
     "100": "QuiltVQA",
     "200": "PathVQA",
@@ -57,39 +37,19 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Evaluate UniMedVL on pathology multiple-choice VQA."
     )
-    parser.add_argument("--repo-root", default=DEFAULT_REPO_ROOT)
-    parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH)
+    parser.add_argument('--repo-root', required=True)
+    parser.add_argument('--model-path', required=True)
     parser.add_argument(
         "--checkpoint-weight-path",
         default=None,
         help="Optional fine-tuned checkpoint directory containing ema_bf16.safetensors or ema.safetensors.",
     )
 
-    parser.add_argument(
-        "--mode",
-        choices=["with_image", "without_image", "both"],
-        default=None,
-        help=(
-            "Convenience mode. If set, default benchmark inputs and HealthGPT-like "
-            "output names are used unless --input/--output override them."
-        ),
-    )
-    parser.add_argument("--output-root", default=DEFAULT_RESULT_DIR)
-    parser.add_argument("--with-image-input", default=DEFAULT_WITH_IMAGE_JSON)
-    parser.add_argument("--without-image-input", default=DEFAULT_WITHOUT_IMAGE_JSON)
-    parser.add_argument("--with-image-output", default=DEFAULT_WITH_IMAGE_OUTPUT)
-    parser.add_argument("--without-image-output", default=DEFAULT_WITHOUT_IMAGE_OUTPUT)
 
-    parser.add_argument("--input", default=None, help="Input benchmark JSON array.")
-    parser.add_argument("--output", default=None, help="Output JSONL path.")
-    parser.add_argument("--image-root", default=DEFAULT_IMAGE_ROOT)
-    parser.add_argument(
-        "--use-image",
-        type=int,
-        choices=[0, 1],
-        default=None,
-        help="Single-run mode only: 1=image + text; 0=text-only.",
-    )
+    parser.add_argument('--input', required=True)
+    parser.add_argument('--output', required=True)
+    parser.add_argument('--image-root', required=True)
+    parser.add_argument('--use-image', type=int, choices=[0, 1], required=True)
 
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--max-new-tokens", type=int, default=64)
@@ -144,70 +104,13 @@ def load_json(path: Path):
     return data
 
 
-def load_finished_ids(output_path: Path):
-    latest = {}
-    if not output_path.is_file():
-        return set()
-    with output_path.open("r", encoding="utf-8") as f:
-        for line in f:
-            try:
-                row = json.loads(line)
-                latest[str(row["num"])] = row
-            except (json.JSONDecodeError, KeyError, TypeError):
-                continue
-    return {sample_id for sample_id, row in latest.items() if row.get("error") is None}
-
-
 def get_dataset_name(row):
     prefix = str(row.get("num", "unknown")).split("-", 1)[0]
     return DATASET_PREFIX.get(prefix, f"Unknown_{prefix}")
 
 
 def resolve_image(image_value, input_json_path: Path, image_root):
-    if image_value is None or str(image_value).strip() == "":
-        return None
-    raw = str(image_value).strip()
-    original = Path(raw)
-    candidates = []
-    if original.is_absolute():
-        candidates.append(original)
-    else:
-        base = Path(image_root) if image_root else input_json_path.parent
-        candidates.append((base / original).resolve())
-    if image_root:
-        root = Path(image_root)
-        candidates.append(root / original.name)
-        candidates.append(root / raw.lstrip("/"))
-
-    seen = set()
-    for candidate in candidates:
-        candidate = Path(candidate)
-        if str(candidate) in seen:
-            continue
-        seen.add(str(candidate))
-        if candidate.is_file():
-            return candidate
-        if candidate.suffix == "":
-            for suffix in (
-                ".jpg",
-                ".jpeg",
-                ".png",
-                ".webp",
-                ".bmp",
-                ".tif",
-                ".tiff",
-                ".JPG",
-                ".JPEG",
-                ".PNG",
-                ".WEBP",
-                ".BMP",
-                ".TIF",
-                ".TIFF",
-            ):
-                extended = candidate.with_suffix(suffix)
-                if extended.is_file():
-                    return extended
-    return None
+    return resolve_input_image(image_value, image_root)
 
 
 def valid_letters(options):
@@ -475,7 +378,7 @@ def evaluate_file(args, bundle, input_path: Path, output_path: Path, use_image: 
             raise ValueError("--limit must be non-negative.")
         rows = rows[: args.limit]
 
-    finished = load_finished_ids(output_path)
+    finished = set()
     pending = [row for row in rows if str(row.get("num")) not in finished]
     input_mode = "image_text" if use_image else "text_only"
     print(
@@ -569,33 +472,12 @@ def evaluate_file(args, bundle, input_path: Path, output_path: Path, use_image: 
 
 
 def planned_runs(args):
-    if args.mode is None:
-        if args.input is None or args.output is None:
-            raise ValueError(
-                "Either use --mode {with_image,without_image,both}, or provide both --input and --output."
-            )
-        use_image = bool(args.use_image) if args.use_image is not None else True
-        return [(Path(args.input), Path(args.output), use_image)]
-
-    output_root = Path(args.output_root)
-    with_output = Path(args.output or args.with_image_output)
-    without_output = Path(args.output or args.without_image_output)
-    if args.output is None and args.output_root != DEFAULT_RESULT_DIR:
-        with_output = output_root / "unimedvl_with_image_debug.jsonl"
-        without_output = output_root / "unimedvl_text_force_debug.jsonl"
-
-    if args.mode == "with_image":
-        return [(Path(args.input or args.with_image_input), with_output, True)]
-    if args.mode == "without_image":
-        return [(Path(args.input or args.without_image_input), without_output, False)]
-    return [
-        (Path(args.with_image_input), with_output, True),
-        (Path(args.without_image_input), without_output, False),
-    ]
+    return [(Path(args.input), Path(args.output), bool(args.use_image))]
 
 
 def main():
     args = parse_args()
+    validate_backend_args(args)
     runs = planned_runs(args)
     bundle = load_unimedvl(args)
     for input_path, output_path, use_image in runs:

@@ -1,146 +1,150 @@
-"""Plan all 11 public-layout conditions; inference requires explicit --execute.
-
-This dispatches the existing public evaluation/ runners. It does not reconstruct
-the manuscript-era task-specific prompts in evaluation/manuscript/vendor/.
-"""
+"""Plan or run all 11 benchmark conditions. Inference requires --execute."""
 import argparse
-import hashlib
+import ast
+from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
-CONDITIONS = {
-    'V1_with_image': ('V1/v1_with_image.json', 1200, 1),
-    'V1_without_image': ('V1/v1_without_image.json', 1200, 0),
-    'V2': ('V2/v2_image_text_conflict_with_image.json', 900, 1),
-    'V3_with_image': ('V3/v3_with_image.json', 900, 1),
-    'V3_without_image': ('V3/v3_without_image.json', 900, 0),
-    'T1_4choice': ('T1/4-choice/t1_4choice_unknown1_2_with_image.json', 1000, 1),
-    'T1_6choice': ('T1/6-choice/t1_6choice_unknown1_2_with_image.json', 400, 1),
-    'T1_7choice': ('T1/7-choice/t1_7choice_unknown1_2_with_image.json', 400, 1),
-    'T2_present': ('T2/t2_answer_present_with_image.json', 900, 1),
-    'T2_absent': ('T2/t2_answer_absent_with_image.json', 900, 1),
-    'T3': ('T3/t3_wrong_answer_hint_with_image.json', 900, 1),
-}
-RUNNERS = tuple(p.name for p in sorted((ROOT/'evaluation').glob('eval_*.py')))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from evaluation.schema import CONDITIONS, load_inputs, load_predictions, new_output, sha256, write_json
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+RUNNERS = tuple(p.name for p in sorted(HERE.glob('eval_*.py')))
+API = ('eval_gpt.py', 'eval_gemini.py')
+RESERVED = {'input', 'output', 'use-image', 'image-root', 'model', 'model-path',
+            'max-new-tokens', 'max-output-tokens', 'api-key', 'mode', 'limit',
+            'with-image-input', 'without-image-input', 'with-image-output',
+            'without-image-output', 'output-root', 'text-only', 'no-send-image'}
 
 
-def read_records(path, expected):
-    raw = Path(path).read_bytes()
-    records = json.loads(raw.decode('utf-8-sig'))
-    if not isinstance(records, list) or len(records) != expected:
-        raise ValueError(f'{path}: expected {expected} records')
-    ids = [str(r.get('num')) for r in records]
-    if len(set(ids)) != len(ids) or any(r.get('num') in (None, '') for r in records):
-        raise ValueError(f'{path}: missing or duplicate IDs')
-    for row in records:
-        options = row.get('options', [])
-        labels = [re.match(r'^([A-H])[).:]\s*', str(o)) for o in options]
-        if len(labels) < 2 or not all(labels):
-            raise ValueError(f'{path}/{row["num"]}: invalid options')
-        legal = {m.group(1) for m in labels}
-        if len(legal) != len(options):
-            raise ValueError(f'{path}/{row["num"]}: duplicate option labels')
-        answer = str(row.get('answer', '')).strip()
-        if answer not in legal and answer not in options:
-            raise ValueError(f'{path}/{row["num"]}: answer is not an option')
-        if not str(row.get('question', '')).strip():
-            raise ValueError(f'{path}/{row["num"]}: empty question')
-    return records, hashlib.sha256(raw).hexdigest()
-
-
-def validate_inputs(data_root, image_root=None):
-    """Read-only structure, pairing, wrong-target and optional image checks."""
-    data_root = Path(data_root).resolve()
-    groups, hashes = {}, {}
-    for name, (relative, count, with_image) in CONDITIONS.items():
-        rows, digest = read_records(data_root/relative, count)
-        hashes[relative] = digest
-        groups[name] = {str(row['num']): row for row in rows}
-        for row in rows:
-            image = row.get('img', '')
-            if bool(image) != bool(with_image):
-                raise ValueError(f'{name}/{row["num"]}: wrong image-availability condition')
-            if image:
-                if Path(image).name != image or '/' in image or '\\' in image:
-                    raise ValueError('Public image references must be basenames, not absolute/traversing paths')
-                if image_root is not None and not (Path(image_root)/image).is_file():
-                    raise FileNotFoundError(Path(image_root)/image)
-    baseline = set(groups['V1_with_image'])
-    if baseline != set(groups['V1_without_image']):
-        raise ValueError('V1 paired IDs differ')
-    core = set(groups['V2'])
-    if not core <= baseline:
-        raise ValueError('V2 maps outside baseline')
-    for name in ('V3_with_image', 'V3_without_image', 'T2_present', 'T2_absent', 'T3'):
-        if set(groups[name]) != core:
-            raise ValueError(f'{name}: 900-question core IDs differ')
-    seen = {1: set(), 2: set()}
-    for name in ('T1_4choice', 'T1_6choice', 'T1_7choice'):
-        for row in groups[name].values():
-            num = str(row.get('t1_original_num', row.get('t3_original_num', '')))
-            level = row.get('t1_unknown_count', row.get('t3_unknown_count'))
-            if level not in seen or num not in core or num in seen[level]:
-                raise ValueError(f'{name}: missing/duplicate/out-of-core T1 mapping')
-            seen[level].add(num)
-    if any(ids != core for ids in seen.values()):
-        raise ValueError('T1 levels do not each cover the complete core')
-    for row in groups['V2'].values():
-        target = row.get('target_wrong_option')
-        gold = str(row['answer']).strip()[0]
-        if target not in {option[0] for option in row['options']} or target == gold:
-            raise ValueError(f'Invalid V2 target_wrong_option: {row["num"]}')
-    return {'files': len(groups), 'records': sum(len(g) for g in groups.values()),
-            'images_checked': image_root is not None, 'sha256': hashes}
+def backend_options(path, config):
+    """Check option names without importing a GPU backend. No shell expansion."""
+    tree = ast.parse(path.read_text(encoding='utf-8'))
+    available = {node.args[0].value[2:]: node for node in ast.walk(tree)
+                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                 and node.func.attr == 'add_argument' and node.args
+                 and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)
+                 and node.args[0].value.startswith('--')}
+    if not isinstance(config, dict):
+        raise ValueError('Backend config must be a JSON object of CLI option names to values')
+    for name, node in available.items():
+        if name not in RESERVED and any(k.arg == 'required' and isinstance(k.value, ast.Constant) and k.value.value for k in node.keywords) and name not in config:
+            raise ValueError(f'This backend requires {name!r} in --backend-config')
+    result = []
+    for key, value in config.items():
+        if key in RESERVED or key not in available:
+            raise ValueError(f'Unsupported/reserved backend setting: {key}')
+        if isinstance(value, (dict, list)) or value is None:
+            raise ValueError(f'Backend setting must be a scalar: {key}')
+        if isinstance(value, bool):
+            action = next((k.value.value for k in available[key].keywords if k.arg == 'action' and isinstance(k.value, ast.Constant)), None)
+            if action != 'store_true':
+                raise ValueError(f'{key}: use a string or number, not a Boolean')
+            if value:
+                result.append('--' + key)
+        else:
+            if key in {'repo-root', 'model-base', 'checkpoint-weight-path'}:
+                value = str(Path(value).expanduser().resolve())
+            result.extend(['--' + key, str(value)])
+    return result
 
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--runner', choices=RUNNERS, required=True)
-    p.add_argument('--model', help='API model ID; not guessed from display names')
-    p.add_argument('--model-path', type=Path, help='Local checkpoint directory')
-    p.add_argument('--python', default=sys.executable, help='Python in the installed model environment')
-    p.add_argument('--data-root', type=Path, default=ROOT/'data')
-    p.add_argument('--image-root', type=Path, default=ROOT/'images')
-    p.add_argument('--output-dir', type=Path, required=True, help='New directory, e.g. result/qwen_new')
-    p.add_argument('--validate-inputs', action='store_true')
-    p.add_argument('--execute', action='store_true', help='Actually invoke models/APIs; may incur costs')
-    p.add_argument('--max-tokens', type=int, default=16)
+    p.add_argument('--runner', required=True, choices=RUNNERS)
+    p.add_argument('--model', help='Explicit provider model ID for API inference')
+    p.add_argument('--model-path', type=Path, help='Local checkpoint path')
+    p.add_argument('--python', default=sys.executable, help='Python in the backend environment')
+    p.add_argument('--data-root', type=Path, default=ROOT / 'data')
+    p.add_argument('--image-root', type=Path, default=ROOT / 'images')
+    p.add_argument('--output-dir', type=Path, required=True)
+    p.add_argument('--backend-config', type=Path, help='JSON of optional model-loader/generation settings')
+    p.add_argument('--max-tokens', type=int, help='Override backend token budget; omitted preserves its default')
+    p.add_argument('--allow-custom-size', action='store_true', help='Allow complete paired toy/custom datasets')
+    p.add_argument('--validate-inputs', action='store_true', help='Check JSON, pairing and images without inference')
+    p.add_argument('--execute', action='store_true', help='Invoke model/API; may incur costs')
     return p
 
 
-def main():
-    a = parser().parse_args()
-    api = a.runner in ('eval_gpt.py', 'eval_gemini.py')
-    if (api and not a.model) or (not api and a.model_path is None):
-        raise SystemExit('API runners require --model; local runners require --model-path')
-    if a.max_tokens <= 0:
-        raise SystemExit('--max-tokens must be positive')
-    output = a.output_dir.expanduser().resolve()
-    data, images = a.data_root.resolve(), a.image_root.resolve()
-    if output.exists() or any(p == output or p in output.parents or output in p.parents for p in (data, images)):
-        raise SystemExit('Choose a NEW output directory outside data and images')
-    audit = validate_inputs(data, images) if a.validate_inputs or a.execute else None
+def main(argv=None):
+    a = parser().parse_args(argv)
+    api = a.runner in API
+    if (api and (not a.model or a.model_path)) or (not api and (not a.model_path or a.model)):
+        raise ValueError('API: specify only --model; local: specify only --model-path')
+    if a.max_tokens is not None and a.max_tokens <= 0:
+        raise ValueError('--max-tokens must be positive')
+    data, images = a.data_root.expanduser().resolve(), a.image_root.expanduser().resolve()
+    protected = [data, images, HERE, ROOT / 'scoring']
+    if a.model_path:
+        protected.append(a.model_path)
+    if a.backend_config:
+        protected.append(a.backend_config)
+    out = new_output(a.output_dir, protected)
+    backend = HERE / a.runner
+    config = json.loads(a.backend_config.read_text(encoding='utf-8-sig')) if a.backend_config else {}
+    extra = backend_options(backend, config)
+    refs, hashes = load_inputs(data, images, a.allow_custom_size) if a.validate_inputs or a.execute else ({}, {})
     plan = []
     for name, (relative, count, with_image) in CONDITIONS.items():
-        command = [a.python, str(ROOT/'evaluation'/a.runner), '--input', str(data/relative),
-                   '--output', str(output/(Path(relative).stem+'.jsonl')), '--use-image', str(with_image),
-                   '--image-root', str(images), '--max-output-tokens' if api else '--max-new-tokens', str(a.max_tokens)]
-        command += ['--model', a.model] if api else ['--model-path', str(a.model_path.resolve())]
-        plan.append({'condition': name, 'requests': count, 'command': command})
-    manifest = {'mode': 'execute' if a.execute else 'preview', 'initial_requests': 9600,
-                'protocol': 'public_generic_runners_not_historical_task_specific', 'inputs': audit, 'plan': plan}
-    print(json.dumps(manifest, indent=2))
+        command = [a.python, str(backend), '--input', str(data / relative),
+                   '--output', str(out / 'raw' / (name + '.jsonl')),
+                   '--use-image', str(int(with_image)), '--image-root', str(images)]
+        command += ['--model', a.model] if api else ['--model-path', str(a.model_path.expanduser().resolve())]
+        if a.max_tokens is not None:
+            command += ['--max-output-tokens' if api else '--max-new-tokens', str(a.max_tokens)]
+        command += extra
+        plan.append(dict(condition=name, records=len(refs[name]) if refs else count, command=command))
+    manifest = dict(schema_version=1, status='planned',
+                    model_key=out.name, model=a.model or a.model_path.name,
+                    created_utc=datetime.now(timezone.utc).isoformat(),
+                    custom_size=a.allow_custom_size, input_sha256=hashes,
+                    initial_requests=sum(p['records'] for p in plan),
+                    source_sha256={p.name: sha256(p) for p in (backend, Path(__file__), HERE / 'schema.py', HERE / 'backend_io.py')},
+                    plan=plan, prediction_sha256={})
+    print(json.dumps(manifest, ensure_ascii=False, indent=2))
     if not a.execute:
-        return
-    output.mkdir(parents=True, exist_ok=False)
-    (output/'public_run_manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf8')
-    for entry in plan:
-        subprocess.run(entry['command'], check=True, cwd=ROOT)
+        return manifest
+    if not api and not a.model_path.expanduser().resolve().is_dir():
+        raise FileNotFoundError(a.model_path)
+    key = 'OPENAI_API_KEY' if a.runner == 'eval_gpt.py' else 'GEMINI_API_KEY'
+    if api and not os.environ.get(key):
+        raise ValueError(f'Set {key} in the environment; credentials are never written to the manifest')
+    out.mkdir(parents=True, exist_ok=False)
+    (out / 'raw').mkdir()
+    manifest['status'] = 'running'
+    write_json(out / 'run_manifest.json', manifest)
+    try:
+        for entry in plan:
+            name = entry['condition']
+            # Fail before dispatch if inputs changed after validation.
+            if any(sha256(data / relative) != digest for relative, digest in hashes.items()):
+                raise ValueError('Input files changed during evaluation')
+            subprocess.run(entry['command'], check=True, env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})
+            clean = load_predictions(out / 'raw' / (name + '.jsonl'), refs[name])
+            target = out / (name + '.jsonl')
+            with target.open('x', encoding='utf-8') as stream:
+                for row in clean.values():
+                    stream.write(json.dumps(row, ensure_ascii=False, allow_nan=False) + '\n')
+            manifest['prediction_sha256'][target.name] = sha256(target)
+            write_json(out / 'run_manifest.json', manifest)
+        if any(sha256(data / relative) != digest for relative, digest in hashes.items()):
+            raise ValueError('Input files changed during evaluation')
+        manifest['status'] = 'complete'
+    except BaseException as error:
+        manifest['status'] = 'failed'
+        manifest['failure_type'] = type(error).__name__
+        raise
+    finally:
+        write_json(out / 'run_manifest.json', manifest)
+    return manifest
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error

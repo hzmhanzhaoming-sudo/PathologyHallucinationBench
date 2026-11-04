@@ -1,0 +1,11 @@
+domain,component,weight
+dataset,QuiltVQA,0.22269625
+dataset,PathVQA,0.23122867
+dataset,PathMMU,0.28498294
+dataset,PatchVQA,0.26109215
+visual,V1,0.32974684
+visual,V2,0.31455696
+visual,V3,0.35569620
+text,T1,0.29059829
+text,T2,0.36231884
+text,T3,0.34708287

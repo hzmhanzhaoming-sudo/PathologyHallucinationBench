@@ -3,6 +3,3 @@
 *.ipynb text eol=lf
 *.md text eol=lf
 *.txt text eol=lf
-# Original evaluation sources are verified byte-for-byte.
-evaluation/manuscript/vendor/** -text
-evaluation/manuscript/provenance/** -text

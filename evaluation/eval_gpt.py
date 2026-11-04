@@ -1,25 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Evaluate OpenAI GPT on the T1 pathology MCQ benchmark.
+"""Model adapter: gpt. Explicit input, output and model configuration.
 
-The evaluator follows the same conventions as the other T1 scripts:
-  - one file supports both image and no-image modes;
-  - the prompt is identical in both modes;
-  - JSONL output records the complete question, raw answer and parsed label;
-  - summary reports overall accuracy and all four source datasets;
-  - invalid-format responses can be retried;
-  - interrupted runs resume from completed sample IDs.
-
-Unified prompt:
-
-    Answer this pathology multiple-choice question using the question and options.
-    Return only the option letter, such as A or B. Do not explain.
-
-The script calls the OpenAI Responses API through urllib and therefore does not
-require the openai Python package. Images are sent as Base64 data URLs.
+Use run_benchmark.py to validate and evaluate all benchmark conditions.
 """
 
 from __future__ import annotations
+
+from backend_io import validate_backend_args, resolve_input_image
 
 import argparse
 import base64
@@ -42,22 +30,6 @@ except Exception:
         return iterable
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DATA_DIR = REPOSITORY_ROOT / "data" / "releases" / "current" / "tasks" / "T1"
-DEFAULT_RESULT_DIR = str(REPOSITORY_ROOT / "outputs" / "gpt" / "T1")
-DEFAULT_WITH_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_with_image.json"
-)
-DEFAULT_WITHOUT_IMAGE_JSON = str(
-    DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_empty_image.json"
-)
-DEFAULT_WITH_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "gpt_T1_with_image.jsonl"
-)
-DEFAULT_WITHOUT_IMAGE_OUTPUT = str(
-    Path(DEFAULT_RESULT_DIR) / "gpt_T1_no_image.jsonl"
-)
-
 DATASET_ORDER = ("QuiltVQA", "PathVQA", "PatchVQA", "PathMMU")
 
 DATASET_PREFIX = {
@@ -70,37 +42,10 @@ DATASET_PREFIX = {
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--mode",
-        choices=["with_image", "without_image", "both"],
-        default=None,
-        help="Convenience mode using default T1 benchmark paths.",
-    )
-    parser.add_argument("--input", default=None, help="Single-run input JSON array.")
-    parser.add_argument("--output", default=None, help="Single-run output JSONL.")
-    parser.add_argument(
-        "--use-image",
-        type=int,
-        choices=(0, 1),
-        default=None,
-        help="Single-run mode: 1 sends images; 0 uses question/options only.",
-    )
-    parser.add_argument("--with-image-input", default=DEFAULT_WITH_IMAGE_JSON)
-    parser.add_argument("--without-image-input", default=DEFAULT_WITHOUT_IMAGE_JSON)
-    parser.add_argument("--with-image-output", default=DEFAULT_WITH_IMAGE_OUTPUT)
-    parser.add_argument("--without-image-output", default=DEFAULT_WITHOUT_IMAGE_OUTPUT)
-    parser.add_argument("--output-root", default=DEFAULT_RESULT_DIR)
-    parser.add_argument("--image-root", default=None)
-    parser.add_argument(
-        "--text-only",
-        action="store_true",
-        help="Single-run mode only: ignore images even if --input is with-image.",
-    )
-    parser.add_argument(
-        "--no-send-image",
-        action="store_true",
-        help="For with_image mode, do not send image pixels; run blind text baseline.",
-    )
+    parser.add_argument('--input', required=True)
+    parser.add_argument('--output', required=True)
+    parser.add_argument('--use-image', type=int, choices=(0, 1), required=True)
+    parser.add_argument('--image-root', required=True)
 
     parser.add_argument("--api-key", default=None, help="Default: env OPENAI_API_KEY")
     parser.add_argument(
@@ -108,11 +53,7 @@ def parse_args():
         default=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
         help="OpenAI-compatible /v1 base URL; defaults to OPENAI_BASE_URL.",
     )
-    parser.add_argument(
-        "--model",
-        default=os.environ.get("OPENAI_MODEL", "gpt-5.6"),
-        help="Vision-capable GPT model. Override if your account uses another model.",
-    )
+    parser.add_argument('--model', required=True)
     parser.add_argument(
         "--max-output-tokens",
         type=int,
@@ -148,62 +89,13 @@ def load_json(path):
     return data
 
 
-def load_finished_ids(path):
-    if not path.exists():
-        return set()
-    latest = {}
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if "num" in row:
-                latest[str(row["num"])] = row
-    # Resume from the latest attempt, matching write_summary().  The previous
-    # implementation permanently marked an ID finished if any older attempt
-    # was valid, even when a later retry was invalid.
-    return {
-        sample_id
-        for sample_id, row in latest.items()
-        if not row.get("error")
-        and (row.get("predicted_label") or row.get("pred_letter")) is not None
-    }
-
-
 def dataset_name(row):
     prefix = str(row.get("num", "unknown")).split("-", 1)[0]
     return DATASET_PREFIX.get(prefix, f"Unknown_{prefix}")
 
 
 def resolve_image(image_value, json_path, image_root):
-    if image_value is None or str(image_value).strip() == "":
-        return None
-    image_path = Path(str(image_value))
-    if not image_path.is_absolute():
-        base = Path(image_root) if image_root else json_path.parent
-        image_path = (base / image_path).resolve()
-    if image_path.is_file():
-        return image_path
-    if not image_path.suffix:
-        for suffix in (
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".tif",
-            ".tiff",
-            ".webp",
-            ".JPG",
-            ".JPEG",
-            ".PNG",
-            ".TIF",
-            ".TIFF",
-            ".WEBP",
-        ):
-            candidate = image_path.with_suffix(suffix)
-            if candidate.is_file():
-                return candidate
-    return image_path
+    return resolve_input_image(image_value, image_root)
 
 
 def image_to_data_url(image_path):
@@ -407,7 +299,7 @@ def write_summary(output_path, input_path=None, model_id=None, use_image=None):
                 total_usage[key] += value
 
     summary = {
-        "task": "T1",
+        "task": Path(input_path).stem if input_path else None,
         "model_id": model_id or (rows[0].get("model_id") if rows else None),
         "prediction_file": str(output_path),
         "input_file": str(input_path) if input_path is not None else None,
@@ -432,30 +324,7 @@ def write_summary(output_path, input_path=None, model_id=None, use_image=None):
 
 
 def planned_runs(args):
-    if args.mode is None:
-        if not args.input or not args.output:
-            raise ValueError("Use --mode {with_image,without_image,both}, or pass --input and --output.")
-        if args.use_image is not None:
-            use_image = bool(args.use_image)
-        else:
-            use_image = not args.text_only
-        return [(Path(args.input), Path(args.output), use_image)]
-
-    output_root = Path(args.output_root)
-    with_output = Path(args.output or args.with_image_output)
-    without_output = Path(args.output or args.without_image_output)
-    if args.output is None and args.output_root != DEFAULT_RESULT_DIR:
-        with_output = output_root / "gpt_T1_with_image.jsonl"
-        without_output = output_root / "gpt_T1_no_image.jsonl"
-
-    if args.mode == "with_image":
-        return [(Path(args.input or args.with_image_input), with_output, True)]
-    if args.mode == "without_image":
-        return [(Path(args.input or args.without_image_input), without_output, False)]
-    return [
-        (Path(args.with_image_input), with_output, True),
-        (Path(args.without_image_input), without_output, False),
-    ]
+    return [(Path(args.input), Path(args.output), bool(args.use_image))]
 
 
 def evaluate_file(args, input_path, output_path, use_image):
@@ -467,9 +336,9 @@ def evaluate_file(args, input_path, output_path, use_image):
     if args.limit is not None:
         rows = rows[: args.limit]
 
-    finished = load_finished_ids(output_path)
+    finished = set()
     pending = [row for row in rows if str(row["num"]) not in finished]
-    send_image = bool(use_image and not args.no_send_image)
+    send_image = bool(use_image)
     mode = "with_image" if use_image else "no_image"
     input_mode = (
         "with_image"
@@ -597,6 +466,7 @@ def evaluate_file(args, input_path, output_path, use_image):
 
 def main():
     args = parse_args()
+    validate_backend_args(args)
     for input_path, output_path, use_image in planned_runs(args):
         evaluate_file(args, input_path, output_path, use_image)
 

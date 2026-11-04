@@ -1,8 +1,5 @@
 tqdm>=4.66
 Pillow>=10.0
 huggingface_hub>=0.25
-pandas>=2.0
-ipykernel>=6.29
-jupyterlab>=4.0
 
 # Install model-specific torch/transformers environments separately.

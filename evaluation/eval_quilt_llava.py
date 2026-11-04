@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Evaluate Quilt-LLaVA on the T1 pathology MCQ benchmark.
+"""Model adapter: quilt_llava. Explicit input, output and model configuration.
 
-The prompt is intentionally identical for image and no-image modes:
-    Answer this pathology multiple-choice question using the question and options.
-    Return only the option letter, such as A or B. Do not explain.
+Use run_benchmark.py to validate and evaluate all benchmark conditions.
 """
 
 from __future__ import annotations
+
+from backend_io import validate_backend_args, resolve_input_image
 
 import argparse
 import csv
@@ -24,17 +24,6 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REPO_ROOT = PROJECT_ROOT / "third_party" / "quilt-llava"
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "Quilt-Llava"
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "releases" / "current" / "tasks" / "T1"
-DEFAULT_INPUT_WITH_IMAGE = DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_with_image.json"
-DEFAULT_INPUT_NO_IMAGE = DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_empty_image.json"
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "quilt_llava" / "T1"
-DEFAULT_OUTPUT_WITH_IMAGE = DEFAULT_OUTPUT_DIR / "quilt_llava_with_image.jsonl"
-DEFAULT_OUTPUT_NO_IMAGE = DEFAULT_OUTPUT_DIR / "quilt_llava_no_image.jsonl"
-DEFAULT_IMAGE_ROOT = PROJECT_ROOT
 
 LABEL_RE = re.compile(r"^\s*([A-Z])\s*[\)\].:\-]?", re.I)
 NUM_PREFIX_TO_DATASET = {
@@ -189,29 +178,7 @@ def get_dataset_name(row: dict[str, Any]) -> str:
 
 
 def resolve_image(raw: Any, input_path: Path, image_root: Path | None) -> Path | None:
-    raw_text = str(raw or "").strip()
-    if not raw_text:
-        return None
-    original = Path(raw_text)
-    bases = []
-    if original.is_absolute():
-        bases.append(original)
-    else:
-        bases.append((input_path.parent / original).resolve())
-        if image_root is not None:
-            bases.append((image_root / original).resolve())
-    if image_root is not None:
-        bases.extend([image_root / original.name, image_root / raw_text.lstrip("/\\")])
-
-    for candidate in bases:
-        if candidate.is_file():
-            return candidate
-        if not candidate.suffix:
-            for suffix in IMAGE_EXTENSIONS:
-                with_suffix = candidate.with_suffix(suffix)
-                if with_suffix.is_file():
-                    return with_suffix
-    return None
+    return resolve_input_image(raw, image_root)
 
 
 def expand2square(pil_img: Image.Image, background_color: tuple[int, int, int]) -> Image.Image:
@@ -343,13 +310,13 @@ def finalize_stats(stats: dict[str, dict[str, int]]) -> dict[str, dict[str, Any]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo-root", type=Path, default=DEFAULT_REPO_ROOT)
-    parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
+    parser.add_argument('--repo-root', type=Path, required=True)
+    parser.add_argument('--model-path', type=Path, required=True)
     parser.add_argument("--model-base", default=None)
-    parser.add_argument("--input", type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--use-image", type=int, choices=(0, 1), default=1)
-    parser.add_argument("--image-root", type=Path, default=DEFAULT_IMAGE_ROOT)
+    parser.add_argument('--input', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--use-image', type=int, choices=(0, 1), required=True)
+    parser.add_argument('--image-root', type=Path, required=True)
     parser.add_argument("--conv-mode", default="llava_v1")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=None)
@@ -367,13 +334,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    validate_backend_args(args)
     mode = "with_image" if args.use_image else "no_image"
-    input_path = args.input or (
-        DEFAULT_INPUT_WITH_IMAGE if args.use_image else DEFAULT_INPUT_NO_IMAGE
-    )
-    output_path = args.output or (
-        DEFAULT_OUTPUT_WITH_IMAGE if args.use_image else DEFAULT_OUTPUT_NO_IMAGE
-    )
+    input_path = args.input
+    output_path = args.output
 
     for path in [args.repo_root, args.model_path, input_path]:
         if not path.exists():

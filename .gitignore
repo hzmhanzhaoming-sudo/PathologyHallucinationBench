@@ -5,8 +5,16 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 .venv/
-data/
-images/
+# Downloaded benchmark data and checkpoints; keep source code and demo images.
+/benchmark_data/
+/checkpoints/
+/images/
+/data/V1/
+/data/V2/
+/data/V3/
+/data/T1/
+/data/T2/
+/data/T3/
 result/
 outputs/
 logs/

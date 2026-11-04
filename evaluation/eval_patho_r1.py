@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""Evaluate Patho-R1 on the T1 pathology MCQ benchmark.
+"""Model adapter: patho_r1. Explicit input, output and model configuration.
 
-This version follows the project's reference Patho-R1 runner for prompting:
-    - system prompt asks Patho-R1 to reason step by step
-    - image/no-image instructions match the original helper script
-    - final answer is requested as <answer>A</answer>
-
-The output format remains this benchmark evaluator's JSONL + summary.json.
+Use run_benchmark.py to validate and evaluate all benchmark conditions.
 """
 
 from __future__ import annotations
+
+from backend_io import validate_backend_args, resolve_input_image
 
 import argparse
 import json
@@ -25,17 +22,6 @@ from qwen_vl_utils import process_vision_info
 from tqdm import tqdm
 from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REPO_ROOT = PROJECT_ROOT / "third_party" / "Patho-R1"
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "Patho-R1-7B"
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "releases" / "current" / "tasks" / "T1"
-DEFAULT_INPUT_WITH_IMAGE = DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_with_image.json"
-DEFAULT_INPUT_NO_IMAGE = DEFAULT_DATA_DIR / "pathology_vqa_benchmark_1200_empty_image.json"
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "patho_r1" / "T1"
-DEFAULT_OUTPUT_WITH_IMAGE = DEFAULT_OUTPUT_DIR / "patho_r1_with_image.jsonl"
-DEFAULT_OUTPUT_NO_IMAGE = DEFAULT_OUTPUT_DIR / "patho_r1_no_image.jsonl"
-DEFAULT_IMAGE_ROOT = PROJECT_ROOT
 
 LABEL_RE = re.compile(r"^\s*([A-Z])\s*[\)\].:\-]?", re.I)
 NUM_PREFIX_TO_DATASET = {
@@ -163,29 +149,7 @@ def get_dataset_name(row: dict[str, Any]) -> str:
 
 
 def resolve_image(raw: Any, input_path: Path, image_root: Path | None) -> Path | None:
-    raw_text = str(raw or "").strip()
-    if not raw_text:
-        return None
-    original = Path(raw_text)
-    candidates = []
-    if original.is_absolute():
-        candidates.append(original)
-    else:
-        candidates.append((input_path.parent / original).resolve())
-        if image_root is not None:
-            candidates.append((image_root / original).resolve())
-    if image_root is not None:
-        candidates.extend([image_root / original.name, image_root / raw_text.lstrip("/\\")])
-
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-        if not candidate.suffix:
-            for suffix in IMAGE_EXTENSIONS:
-                with_suffix = candidate.with_suffix(suffix)
-                if with_suffix.is_file():
-                    return with_suffix
-    return None
+    return resolve_input_image(raw, image_root)
 
 
 def build_messages(row: dict[str, Any], image_path: Path | None, strict_retry: bool) -> list[dict[str, Any]]:
@@ -266,12 +230,11 @@ def finalize_stats(stats: dict[str, dict[str, int]]) -> dict[str, dict[str, Any]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo-root", type=Path, default=DEFAULT_REPO_ROOT)
-    parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
-    parser.add_argument("--input", type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--use-image", type=int, choices=(0, 1), default=1)
-    parser.add_argument("--image-root", type=Path, default=DEFAULT_IMAGE_ROOT)
+    parser.add_argument('--model-path', type=Path, required=True)
+    parser.add_argument('--input', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--use-image', type=int, choices=(0, 1), required=True)
+    parser.add_argument('--image-root', type=Path, required=True)
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--limit", type=int)
@@ -284,15 +247,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    validate_backend_args(args)
     mode = "with_image" if args.use_image else "no_image"
-    input_path = args.input or (
-        DEFAULT_INPUT_WITH_IMAGE if args.use_image else DEFAULT_INPUT_NO_IMAGE
-    )
-    output_path = args.output or (
-        DEFAULT_OUTPUT_WITH_IMAGE if args.use_image else DEFAULT_OUTPUT_NO_IMAGE
-    )
+    input_path = args.input
+    output_path = args.output
 
-    for path in [args.repo_root, args.model_path, input_path]:
+    for path in [args.model_path, input_path]:
         if not path.exists():
             raise FileNotFoundError(str(path))
     output_path.parent.mkdir(parents=True, exist_ok=True)

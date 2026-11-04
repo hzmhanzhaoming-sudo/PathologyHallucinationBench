@@ -157,7 +157,7 @@ The family-level profiles retain all six task scores, while the correlation matr
 ```text
 PathologyHallucinationBench/
 ├── assets/       # Overview and result figures displayed on this page
-├── evaluation/   # Model-family runners, full run planner and manuscript runners
+├── evaluation/   # Model adapters, input validation and the 11-condition run planner
 ├── scoring/      # Six-task scoring, three separate dimensions and Pareto analysis
 ├── README.md
 └── requirements.txt
@@ -167,61 +167,116 @@ PathologyHallucinationBench/
 
 ### Installation and data
 
+The commands below use Bash and are run from the repository root (the desktop
+copy is named `code`). Python 3.10+ is required.
+
 ```bash
-pip install -r requirements.txt
-python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='hanzhaoming/triplet-benchmark', repo_type='dataset', local_dir='.', allow_patterns=['data/**', 'images/**'])"
+git clone https://github.com/hzmhanzhaoming-sudo/PathologyHallucinationBench.git
+cd PathologyHallucinationBench
+python -m pip install -r requirements.txt
+python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='hanzhaoming/triplet-benchmark', repo_type='dataset', local_dir='benchmark_data', allow_patterns=['data/**', 'images/**'])"
 ```
 
-The [dataset](https://huggingface.co/datasets/hanzhaoming/triplet-benchmark)
-uses `data/` and `images/`. Use an authorized Hugging Face login or `HF_TOKEN`.
-Local models require their checkpoints and compatible model environments;
-API credentials use `OPENAI_API_KEY` or `GEMINI_API_KEY`.
+If the repository is already present, skip the first two commands and open its
+root directory. Authenticate with Hugging Face if the dataset requires access.
+The download is kept in `benchmark_data/`, separate from the source code:
 
-### Run evaluation
+```text
+benchmark_data/
+  data/V1/ ... data/T3/      # Released reference JSONs
+  images/                   # Image paths referenced by those JSONs
+```
+
+For local inference, install the selected model's Torch/Transformers environment
+and obtain its checkpoint separately. `requirements.txt` provides the common
+utilities, not every model's GPU environment. Scoring alone needs only Python's
+standard library and the reference/prediction files.
+
+### 1. Evaluate Qwen3.5-9B
+
+Place the Qwen3.5-9B checkpoint in `checkpoints/Qwen3.5-9B`, or replace
+`--model-path` with its actual location. First check all inputs without inference:
 
 ```bash
-# Preview the 11 conditions; does not run inference.
 python evaluation/run_benchmark.py --runner eval_qwen35.py \
-  --model-path /path/to/Qwen3.5-9B --output-dir result/qwen_new --validate-inputs
-
-# Add --execute to run the displayed plan.
-# For API models, use --runner eval_gpt.py --model YOUR_MODEL_ID instead.
+  --model-path checkpoints/Qwen3.5-9B \
+  --data-root benchmark_data/data --image-root benchmark_data/images \
+  --output-dir result/main/qwen35_9b --max-tokens 16 --validate-inputs
 ```
 
-The complete benchmark has 9,600 initial requests per model. The public-layout
-planner uses the model-family evaluators. Task-specific manuscript runners and
-their server-layout commands are in [`evaluation/manuscript`](evaluation/manuscript).
-
-### Run scoring
+Run the same plan with inference enabled:
 
 ```bash
-python scoring/score.py --repo-root . --output result/scored_qwen
+python evaluation/run_benchmark.py --runner eval_qwen35.py \
+  --model-path checkpoints/Qwen3.5-9B \
+  --data-root benchmark_data/data --image-root benchmark_data/images \
+  --output-dir result/main/qwen35_9b --max-tokens 16 --execute
 ```
 
-Place prediction JSONL files in `result/<model>/`. The scorer reports:
+This evaluates 11 conditions (9,600 initial item evaluations) and writes
+normalized prediction files plus `run_manifest.json` into `result/main/qwen35_9b`.
+Previewing creates no output directory. An actual run requires a new output
+directory; use a different name for each model or repeat run.
 
-- Dataset-weighted diagnostic accuracy;
-- Visual resistance;
-- Textual resistance;
-- Six task-specific scores, event counts and input coverage.
-
-There is no combined overall score. Existing output directories are not overwritten.
-The notebook rejects malformed, duplicate or incomplete inputs by default.
-
-To compute three-axis scores and Pareto layers from explicit score/count/weight CSVs:
+For an API model, set `OPENAI_API_KEY` and `OPENAI_MODEL_ID` in your environment
+and use the provider's actual model ID. The following command makes real API calls:
 
 ```bash
-python scoring/score_axes.py --scores six_task_scores.csv \
-  --base-counts base_dataset_counts.csv --weights clinician_weights.csv \
-  --output result/three_axes
+python evaluation/run_benchmark.py --runner eval_gpt.py \
+  --model "${OPENAI_MODEL_ID:?Set OPENAI_MODEL_ID to your provider model ID}" \
+  --data-root benchmark_data/data --image-root benchmark_data/images \
+  --output-dir result/main/gpt_model --max-tokens 512 --execute
 ```
 
-CSV columns are documented in `scoring/score_axes.py`.
+For Gemini use `eval_gemini.py`, `GEMINI_API_KEY` and the corresponding provider
+model ID, with a separate output directory. See
+[`evaluation/README.md`](evaluation/README.md) for the other model adapters,
+source-checkout configuration and generation settings.
 
-### Offline tests
+### 2. Score the six tasks independently
+
+The following commands score the saved Qwen3.5-9B predictions; they do not load
+the model or call an API. Each task has its own output directory.
 
 ```bash
-python -m unittest discover -s evaluation/tests -v
-python evaluation/manuscript/test_offline.py
-python -m unittest discover -s scoring/tests -v
+python scoring/score_v1.py --data-root benchmark_data/data \
+  --runs result/main/qwen35_9b --output result/scores/qwen35_9b/V1
+python scoring/score_v2.py --data-root benchmark_data/data \
+  --runs result/main/qwen35_9b --output result/scores/qwen35_9b/V2
+python scoring/score_v3.py --data-root benchmark_data/data \
+  --runs result/main/qwen35_9b --output result/scores/qwen35_9b/V3
+python scoring/score_t1.py --data-root benchmark_data/data \
+  --runs result/main/qwen35_9b --output result/scores/qwen35_9b/T1
+python scoring/score_t2.py --data-root benchmark_data/data \
+  --runs result/main/qwen35_9b --output result/scores/qwen35_9b/T2
+python scoring/score_t3.py --data-root benchmark_data/data \
+  --runs result/main/qwen35_9b --output result/scores/qwen35_9b/T3
 ```
+
+**To score V1 only, run just the first command.** V1 needs its image-present and
+image-absent outputs; V3 needs only its own two outputs. Other tasks can remain
+unfinished. Each scorer reads only its required files and exports the task score,
+event counts, condition accuracies and provenance. The exact file requirements
+are listed in [`scoring/README.md`](scoring/README.md).
+
+### 3. Combine the six reports into three scores and Pareto layers
+
+```bash
+python scoring/score_axes.py \
+  --task-results result/scores/qwen35_9b/V1 result/scores/qwen35_9b/V2 \
+                 result/scores/qwen35_9b/V3 result/scores/qwen35_9b/T1 \
+                 result/scores/qwen35_9b/T2 result/scores/qwen35_9b/T3 \
+  --weights scoring/weights.csv --output result/three_axes/qwen35_9b
+```
+
+The main output is `result/three_axes/qwen35_9b/three_axis_scores.csv`, containing
+weighted accuracy, visual resistance, textual resistance and Pareto layer.
+There is no combined overall score. With only one model, its Pareto layer is
+necessarily 1; meaningful comparisons require multiple models.
+
+To compare models, pass the same model directories to **each** task scorer,
+for example `--runs result/main/qwen35_9b result/main/gpt_model`, and save the
+six reports under a new tree such as `result/scores/comparison/V1` through `T3`.
+Then pass those six comparison directories to `score_axes.py`. All reports must
+contain the same models and paired reference data. Existing outputs are not
+overwritten, and missing records or inference errors stop scoring.
