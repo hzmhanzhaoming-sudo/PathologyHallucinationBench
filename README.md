@@ -120,6 +120,32 @@ The benchmark covers **16 models in four families**, with four models per family
 | General medical | HealthGPT-Pro-4B | [eval_healthgpt_pro.py](evaluation/eval_healthgpt_pro.py) |
 | General medical | HealthGPT-Pro-8B | [eval_healthgpt_pro.py](evaluation/eval_healthgpt_pro.py) |
 
+## Dataset and model source links
+
+### Benchmark data
+
+The curated evaluation inputs and images are available from the [PathologyHallucinationBench dataset on Hugging Face](https://huggingface.co/datasets/hanzhaoming/triplet-benchmark). This release is distinct from the original source datasets below.
+
+### Original source datasets
+
+| Source | Official project / data access |
+|---|---|
+| QuiltVQA | [Quilt-LLaVA project](https://github.com/aldraus/quilt-llava) · [Quilt-VQA data instructions](https://github.com/aldraus/quilt-llava/blob/main/docs/Data.md) |
+| PathVQA | [PathVQA repository](https://github.com/UCSD-AI4H/PathVQA) · [Official challenge and data information](https://pathvqachallenge.grand-challenge.org/Data_Info/) |
+| PathMMU | [PathMMU repository](https://github.com/PathMMU-Benchmark/PathMMU) · [Dataset](https://huggingface.co/datasets/jamessyx/PathMMU) |
+| PatchVQA | [PathBench repository and PatchVQA access instructions](https://github.com/superjamessyx/PathBench) |
+
+Please cite the original source works and follow their respective licenses and access conditions when using their data.
+
+### Evaluated model resources
+
+The model names above follow the experiment configurations. The links below restore the original model-resource references; provider model catalogs are general documentation, not immutable snapshots of the evaluated API versions.
+
+- **Closed-source general:** [GPT model documentation](https://platform.openai.com/docs/models) (GPT-5.6 SOL / Luna configuration labels); [Gemini model documentation](https://ai.google.dev/gemini-api/docs/models) (Gemini 3.5 Flash Lite / 3.6 Flash configuration labels).
+- **Open-source general:** [GLM-4.6V Flash](https://huggingface.co/zai-org/GLM-4.6V-Flash), [Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B), [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B), [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B).
+- **Pathology-specialized:** [Quilt-LLaVA](https://github.com/aldraus/quilt-llava), [PathGen-LLaVA](https://huggingface.co/jamessyx/PathGen-LLaVA), [Patho-R1-3B](https://huggingface.co/WenchuanZhang/Patho-R1-3B), [Patho-R1-7B](https://huggingface.co/WenchuanZhang/Patho-R1-7B).
+- **General medical:** [HuatuoGPT-Vision](https://github.com/FreedomIntelligence/HuatuoGPT-Vision), [UniMedVL](https://huggingface.co/General-Medical-AI/UniMedVL), [HealthGPT-Pro-4B / Pro-8B](https://github.com/ZJU4HealthCare/HealthGPT/tree/main/HealthGPT-Pro).
+
 ## Main findings
 
 ### Visual stress-test results
